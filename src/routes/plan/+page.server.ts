@@ -14,5 +14,9 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
 		redirect(303, '/plan/generate');
 	}
 
-	return { fullPlan };
+	// Compute today's day index for highlighting
+	const jsDay = new Date().getDay();
+	const todayIndex = jsDay === 0 ? 6 : jsDay - 1;
+
+	return { fullPlan, todayIndex };
 };

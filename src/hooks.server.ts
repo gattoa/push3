@@ -59,7 +59,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 		// equipment defaults to '{}' on auto-create; onboarding always sets at least one
 		const hasOnboarded = settings?.equipment && settings.equipment.length > 0;
-		redirect(303, hasOnboarded ? '/plan' : '/onboarding');
+		redirect(303, hasOnboarded ? '/workout' : '/onboarding');
 	}
 
 	// Authenticated users on protected routes (not onboarding/api) → verify onboarding

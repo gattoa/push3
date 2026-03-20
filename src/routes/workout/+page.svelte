@@ -3,10 +3,13 @@
 
 	let { data } = $props();
 	const day: FullPlanDay = data.day;
+	const dayIndex: number = data.dayIndex;
 	const unitPref: string = data.unitPref;
-	const weekNumber: number = data.plan.week_number;
 
 	const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+	// Format today's date
+	const todayDate = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
 	// Local state for each set, keyed by planned_set_id
 	let setStates = $state<Record<string, {
@@ -95,7 +98,6 @@
 		if (!s) return;
 
 		if (s.status === 'completed') {
-			// Toggle back to pending
 			saveSet(setId, 'pending');
 		} else {
 			saveSet(setId, 'completed');
@@ -115,17 +117,22 @@
 </script>
 
 <svelte:head>
-	<title>Push — {DAY_NAMES[day.day_index]} Workout</title>
+	<title>Push — {DAY_NAMES[dayIndex]} Workout</title>
 </svelte:head>
 
 <div class="workout-page">
 	<header class="workout-header">
-		<a href="/workout" class="back-link">&larr; Today</a>
-		<div class="header-info">
-			<h1>{DAY_NAMES[day.day_index]}</h1>
-			<span class="split-badge">{day.split_label}</span>
+		<a href="/plan" class="nav-icon" title="Weekly agenda">
+			<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+				<rect x="3" y="4" width="14" height="1.5" rx="0.75" fill="currentColor"/>
+				<rect x="3" y="9.25" width="14" height="1.5" rx="0.75" fill="currentColor"/>
+				<rect x="3" y="14.5" width="14" height="1.5" rx="0.75" fill="currentColor"/>
+			</svg>
+		</a>
+		<div class="header-text">
+			<h1>{DAY_NAMES[dayIndex]}, {todayDate}</h1>
+			<span class="split-label">{day.split_label}</span>
 		</div>
-		<span class="week-label">Week {weekNumber}</span>
 	</header>
 
 	<!-- Progress bar -->
@@ -141,8 +148,8 @@
 
 	{#if day.exercises.length === 0}
 		<div class="rest-state">
-			<p>Rest day. No exercises prescribed.</p>
-			<a href="/workout" class="btn btn-secondary">Back to Today</a>
+			<p>Rest day. Recover and prepare for your next session.</p>
+			<a href="/plan" class="btn btn-secondary">View Weekly Plan</a>
 		</div>
 	{:else}
 		<div class="exercise-list">
@@ -256,7 +263,7 @@
 						<span class="stat-label">Volume ({unitPref})</span>
 					</div>
 				</div>
-				<a href="/workout" class="btn btn-primary">Back to Today</a>
+				<a href="/plan" class="btn btn-primary">View Weekly Plan</a>
 			</div>
 		{/if}
 	{/if}
@@ -273,54 +280,45 @@
 
 	.workout-header {
 		display: flex;
-		align-items: center;
+		align-items: flex-start;
 		gap: 0.75rem;
 		margin-bottom: 1rem;
 	}
 
-	.back-link {
+	.nav-icon {
 		color: var(--color-text-muted);
-		text-decoration: none;
-		font-size: 0.85rem;
-		font-weight: 500;
-		padding: 0.25rem 0;
+		width: 36px;
+		height: 36px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border: 1.5px solid var(--color-border);
+		border-radius: var(--radius-sm);
 		flex-shrink: 0;
+		transition: all 0.15s ease;
 	}
 
-	.back-link:hover {
+	.nav-icon:hover {
+		border-color: var(--color-text-muted);
 		color: var(--color-text);
 	}
 
-	.header-info {
-		display: flex;
-		align-items: baseline;
-		gap: 0.5rem;
+	.header-text {
 		flex: 1;
 		min-width: 0;
 	}
 
 	.workout-header h1 {
 		font-family: var(--font-display);
-		font-size: 1.25rem;
+		font-size: 1.15rem;
 		font-weight: 700;
+		line-height: 1.3;
 	}
 
-	.split-badge {
-		font-size: 0.7rem;
+	.split-label {
+		font-size: 0.8rem;
 		color: var(--color-text-muted);
-		background: var(--color-surface);
-		padding: 0.15rem 0.4rem;
-		border-radius: 4px;
-		white-space: nowrap;
-	}
-
-	.week-label {
-		font-family: var(--font-display);
-		font-size: 0.65rem;
-		color: var(--color-text-muted);
-		letter-spacing: 0.05em;
-		text-transform: uppercase;
-		flex-shrink: 0;
+		text-transform: capitalize;
 	}
 
 	/* Progress */

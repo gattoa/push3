@@ -51,11 +51,38 @@ export async function getExercises(limit = 50, offset = 0): Promise<Exercise[]> 
 	return fetchExerciseDB<Exercise[]>(`/api/v1/exercises?limit=${limit}&offset=${offset}`);
 }
 
+/** Raw shape returned by ExerciseDB v1 API */
+interface ExerciseDBResponse {
+	exerciseId: string;
+	name: string;
+	gifUrl: string;
+	targetMuscles: string[];
+	bodyParts: string[];
+	equipments: string[];
+	secondaryMuscles: string[];
+	instructions: string[];
+}
+
+/** Map ExerciseDB v1 response to our Exercise type */
+function mapExercise(raw: ExerciseDBResponse): Exercise {
+	return {
+		id: raw.exerciseId,
+		name: raw.name,
+		gifUrl: raw.gifUrl,
+		target: raw.targetMuscles?.[0] ?? '',
+		bodyPart: raw.bodyParts?.[0] ?? '',
+		equipment: raw.equipments?.[0] ?? '',
+		secondaryMuscles: raw.secondaryMuscles ?? [],
+		instructions: (raw.instructions ?? []).map((s) => s.replace(/^Step:\d+\s*/, ''))
+	};
+}
+
 /** Search exercises by name (fuzzy matching) */
 export async function searchExercises(query: string, limit = 50, offset = 0): Promise<Exercise[]> {
-	return fetchExerciseDB<Exercise[]>(
-		`/api/v1/exercises/search?search=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}`
+	const raw = await fetchExerciseDB<ExerciseDBResponse[]>(
+		`/api/v1/exercises/search?q=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}`
 	);
+	return raw.map(mapExercise);
 }
 
 /** Get a single exercise by ID */
