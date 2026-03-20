@@ -1,7 +1,7 @@
 # Push — POC Roadmap
 
 > **Scope:** Prove the end-to-end feedback loop — Onboarding → Plan Generation → Workout Logging → Check-In → Re-Generation.
-> Last updated: 2026-03-20
+> Last updated: 2026-03-20 (Phase 4 complete)
 
 ---
 
@@ -144,27 +144,27 @@ These decisions reduce scope without breaking the loop:
 
 ---
 
-## Phase 3: Workout Logging
+## Phase 3: Workout Logging ✅
 
 **Goal:** Athlete logs actual performance against their prescribed plan. This produces the data that makes the next plan smarter.
-**Status:** Not Started
+**Status:** Complete
 
 ### Deliverables
 
 #### Daily Workout View
-- [ ] Workout route (`/workout/[day]`) — shows today's prescribed exercises
-- [ ] Exercise list with prescribed sets, reps, and target weight
-- [ ] For cold start exercises (no target weight): display input fields without a target
+- [x] Workout route (`/workout/[day]`) — shows today's prescribed exercises
+- [x] Exercise list with prescribed sets, reps, and target weight
+- [x] For cold start exercises (no target weight): display input fields without a target
 
 #### Set Logging
-- [ ] Per-set logging: actual weight, actual reps, completion status (completed / skipped)
-- [ ] Save each set log to `set_logs` table immediately on entry
-- [ ] Visual feedback on completion (set marked done)
-- [ ] Historical indicator: when an exercise has prior logged data, show last performance for reference
+- [x] Per-set logging: actual weight, actual reps, completion status (completed / skipped)
+- [x] Save each set log to `set_logs` table immediately on entry (via `/api/log-set` upsert endpoint)
+- [x] Visual feedback on completion (set marked done — row highlights green, skip dims row)
+- [ ] Historical indicator: when an exercise has prior logged data, show last performance for reference — **deferred; baselines available in generation context but not yet surfaced in workout UI**
 
 #### Session State
-- [ ] Active workout persists across page refresh (read from Supabase, not just local state)
-- [ ] Workout summary on day completion: total sets completed, total volume
+- [x] Active workout persists across page refresh (read from Supabase via `get_full_plan` RPC, not local state)
+- [x] Workout summary on day completion: total sets completed, total volume, skipped count
 
 ### Dependencies
 - Phase 2 (plan must exist to log against)
@@ -175,38 +175,60 @@ These decisions reduce scope without breaking the loop:
 
 ---
 
-## Phase 4: Check-In & Re-Generation
+## Phase 3.1: UX Refinements ✅
+
+**Goal:** Shift navigation from plan-first to daily-first. The workout screen becomes the home screen; the plan view becomes a secondary weekly agenda.
+**Status:** Complete
+
+### Deliverables
+
+- [x] `/workout` is now the home screen (today's workout), redirected to from `/` after auth
+- [x] `/plan` redesigned as weekly agenda with day cards, mini progress bars, completion indicators
+- [x] `/exercise/[id]` detail page with GIF, instructions, target muscle, equipment
+- [x] Navigation: workout → plan (via hamburger icon), plan → workout ("← Today" link)
+- [x] Design documentation: `docs/design/README.md`, `daily-workout.md`, `weekly-agenda.md`, `exercise-detail.md`
+- [x] Auth guard in `hooks.server.ts` updated to redirect to `/workout` (not `/plan`)
+
+---
+
+## Phase 4: Check-In & Re-Generation ✅
 
 **Goal:** Athlete completes end-of-week check-in, system generates Week 2+ plan using all accumulated data. The loop closes.
-**Status:** Not Started
+**Status:** Complete
 
 ### Deliverables
 
 #### Check-In Flow
-- [ ] Check-in route (`/check-in`) — end-of-week form
-- [ ] Collect: current body weight, injury changes (new/recovered), equipment changes, preference adjustments
-- [ ] Save to `check_ins` table (historical record)
-- [ ] Update `user_settings` with current state (injuries, equipment, preferences)
-- [ ] Trigger plan generation on submit
+- [x] Check-in route (`/check-in`) — end-of-week form with week summary stats
+- [x] Collect: current body weight, injury changes (new/recovered), equipment changes, preference adjustments (free-text notes)
+- [x] Save to `check_ins` table (historical record)
+- [x] Update `user_settings` with current state (injuries, equipment)
+- [x] Trigger plan generation on submit (marks current plan as `completed`, redirects to `/plan/generate`)
 
 #### Informed Plan Generation (Week 2+)
-- [ ] Extend `/api/generate-plan` context assembly to include:
+- [x] `/api/generate-plan` context assembly includes (via `get_generation_context` RPC):
   - This week's `set_logs` (prescribed vs. actual for every set)
   - Historical `set_logs` from prior weeks (per-exercise baselines and trends)
   - `check_ins` history (weight trend, injury timeline)
   - Previous `weekly_plans` (for adherence analysis)
-- [ ] Claude now receives the full context per the architecture plan
-- [ ] Week 2+ plans prescribe target weights for exercises with established baselines
-- [ ] New exercises introduced still have no target weight until baseline is logged
+- [x] Claude receives the full context per the architecture plan
+- [x] System prompt includes explicit progressive overload rules (weight increase ranges per body region, handling of missed reps, exercise swaps for poor adherence)
+- [x] Latest check-in notes surfaced prominently in user message for AI coach to factor in
+- [x] Week 2+ plans prescribe target weights for exercises with established baselines
+- [x] New exercises introduced still have no target weight until baseline is logged (system prompt rule 4)
 
 #### Plan Generation State
-- [ ] Loading state after check-in submit ("Building your plan...")
-- [ ] Redirect to plan view when generation completes
-- [ ] Error handling if generation fails (retry option, clear error message)
+- [x] Loading state after check-in submit (reuses `/plan/generate` page — "Building your plan...")
+- [x] Redirect to plan view when generation completes
+- [x] Error handling if generation fails (retry option, clear error message)
 
 #### Loop Verification
-- [ ] Week 2 plan demonstrates adaptation: target weights based on Week 1 logs, volume adjustments based on completion rates, exercise swaps for poor adherence
-- [ ] All data from Week 1 (set logs, check-in) is visible in the generation context
+- [ ] Week 2 plan demonstrates adaptation — **requires live testing (not code-verifiable); infrastructure is in place**
+- [x] All data from Week 1 (set logs, check-in) is visible in the generation context (via `get_generation_context` RPC)
+
+#### Navigation (added in Phase 4)
+- [x] Check-in link in weekly plan view header (`/plan` → "Check-In →")
+- [x] Check-in CTA in workout complete summary card (`/workout` → "Weekly Check-In")
 
 ### Dependencies
 - Phase 3 (set logs must exist for informed generation)
@@ -306,6 +328,6 @@ check_ins
 | Plan Review celebration UX | Polish; POC validates adaptation, not presentation |
 | Dual logging (quick + granular) | UX refinement; single path captures required data |
 | Configurable check-in day | Simplification; fixed Sunday boundary |
-| Navigation pattern design | TBD; simple routing is sufficient for POC |
-| ExerciseDB GIFs in exercise detail | Nice-to-have for POC; exercise names + instructions sufficient |
+| ~~Navigation pattern design~~ | ~~TBD~~ → Addressed in Phase 3.1 (daily-first navigation) |
+| ~~ExerciseDB GIFs in exercise detail~~ | ~~Nice-to-have~~ → Addressed in Phase 3.1 (`/exercise/[id]` page with GIFs) |
 | AI rationale captions | Polish; not required to prove the loop |

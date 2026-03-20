@@ -263,7 +263,10 @@
 						<span class="stat-label">Volume ({unitPref})</span>
 					</div>
 				</div>
-				<a href="/plan" class="btn btn-primary">View Weekly Plan</a>
+				<div class="summary-actions">
+				<a href="/plan" class="btn btn-secondary">View Weekly Plan</a>
+				<a href="/check-in" class="btn btn-primary">Weekly Check-In</a>
+			</div>
 			</div>
 		{/if}
 	{/if}
@@ -573,6 +576,12 @@
 		border-radius: var(--radius);
 		padding: 1.5rem;
 		text-align: center;
+	}
+
+	.summary-actions {
+		display: flex;
+		gap: 0.75rem;
+		justify-content: center;
 	}
 
 	.summary-card h3 {

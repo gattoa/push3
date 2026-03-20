@@ -120,7 +120,11 @@ function buildSystemPrompt(): string {
 2. The number of training days must match the athlete's training_days_per_week preference.
 3. Only use exercises from the provided exercise catalog. Every exercise_id must exist in the catalog.
 4. For Week 1 (cold start) or any exercise without an established performance baseline: set target_weight to null. The athlete will log their working weight to establish a baseline.
-5. For Week 2+ with baselines: prescribe target_weight based on historical performance. Apply progressive overload (small weight increases where the athlete completed all prescribed reps).
+5. For Week 2+ with baselines: prescribe target_weight based on historical performance.
+   - If the athlete completed all prescribed reps at a given weight: increase by 2.5-5 lb (1-2.5 kg) for upper body, 5-10 lb (2.5-5 kg) for lower body.
+   - If the athlete failed to complete prescribed reps: keep weight the same or reduce slightly.
+   - If the athlete skipped most sets for an exercise: consider swapping it for a similar movement.
+   - Factor in check-in notes — the athlete may request changes, report schedule constraints, or flag new preferences.
 6. Rep ranges should match the athlete's goal:
    - build_muscle: 8-12 reps, 3-4 sets per exercise
    - build_strength: 3-6 reps, 4-5 sets per exercise
@@ -131,6 +135,8 @@ function buildSystemPrompt(): string {
 9. Prioritize compound movements early in each session.
 10. Include warm-up notes for the first exercise of each day.
 11. Use the athlete's unit preference (lb or kg) for all target weights.
+12. Exercise variety is critical. Do NOT repeat the same exercise across multiple training days in the same week. Each training day should have a distinct set of exercises. Exercises may recur across weeks but not within the same week.
+13. Select a diverse mix of exercises from the catalog — vary movement patterns (push, pull, hinge, squat, carry, isolation) and target different muscle groups across the week.
 
 ## Output
 Call the generate_weekly_plan tool exactly once with the complete plan.`;
@@ -175,6 +181,15 @@ ${JSON.stringify(historical_set_logs, null, 1)}
 	}
 
 	if (check_in_history.length > 0) {
+		// Surface the most recent check-in notes prominently
+		const latestCheckIn = check_in_history[check_in_history.length - 1];
+		if (latestCheckIn.notes) {
+			msg += `\n## Athlete Notes (from latest check-in)
+"${latestCheckIn.notes}"
+Pay attention to these preferences when building the plan.
+`;
+		}
+
 		msg += `\n## Check-In History
 \`\`\`json
 ${JSON.stringify(check_in_history, null, 1)}

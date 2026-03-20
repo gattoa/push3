@@ -34,6 +34,7 @@
 	<header class="agenda-header">
 		<a href="/workout" class="back-link">&larr; Today</a>
 		<h1>This Week</h1>
+		<a href="/check-in" class="checkin-link">Check-In &rarr;</a>
 	</header>
 
 	<div class="day-list">
@@ -120,6 +121,18 @@
 		font-family: var(--font-display);
 		font-size: 1.25rem;
 		font-weight: 700;
+	}
+
+	.checkin-link {
+		color: var(--color-accent);
+		text-decoration: none;
+		font-size: 0.85rem;
+		font-weight: 600;
+		transition: opacity 0.15s ease;
+	}
+
+	.checkin-link:hover {
+		opacity: 0.8;
 	}
 
 	/* Day cards */
