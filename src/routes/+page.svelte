@@ -1,14 +1,9 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-
 	let { data } = $props();
 	let loading = $state(false);
 
-	$effect(() => {
-		if (data.session) {
-			goto('/dashboard');
-		}
-	});
+	// Auth guard in hooks.server.ts handles redirecting authenticated users
+	// to /onboarding or /plan based on onboarding status
 
 	async function signInWithGoogle() {
 		loading = true;
