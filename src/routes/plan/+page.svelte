@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { FullPlan, FullPlanDay } from '$lib/types/database';
+	import type { FullPlan, FullPlanDay, FullPlanSet } from '$lib/types/database';
 
 	let { data } = $props();
 	const plan: FullPlan = data.fullPlan;
@@ -20,6 +20,25 @@
 		if (weight === null) return '—';
 		return `${weight} ${unit}`;
 	}
+
+	function getSetStatus(set: FullPlanSet): 'completed' | 'skipped' | 'pending' | 'none' {
+		if (!set.log) return 'none';
+		return set.log.status as 'completed' | 'skipped' | 'pending';
+	}
+
+	function getDayProgress(day: FullPlanDay): { done: number; total: number } {
+		let total = 0;
+		let done = 0;
+		for (const ex of day.exercises) {
+			for (const set of ex.sets) {
+				total++;
+				if (set.log && (set.log.status === 'completed' || set.log.status === 'skipped')) {
+					done++;
+				}
+			}
+		}
+		return { done, total };
+	}
 </script>
 
 <svelte:head>
@@ -35,14 +54,19 @@
 	<!-- Day tabs -->
 	<nav class="day-tabs">
 		{#each sortedDays as day}
+			{@const progress = getDayProgress(day)}
 			<button
 				class="day-tab"
 				class:active={selectedDayIndex === day.day_index}
 				class:rest={day.exercises.length === 0}
+				class:done={progress.total > 0 && progress.done === progress.total}
 				onclick={() => selectedDayIndex = day.day_index}
 			>
 				<span class="day-abbrev">{DAY_NAMES[day.day_index]?.slice(0, 3)}</span>
 				<span class="day-label">{day.split_label}</span>
+				{#if progress.total > 0}
+					<span class="day-progress">{progress.done}/{progress.total}</span>
+				{/if}
 			</button>
 		{/each}
 	</nav>
@@ -59,6 +83,17 @@
 				<p>Rest day. Recover and prepare for your next session.</p>
 			</div>
 		{:else}
+			{@const dayProgress = getDayProgress(selectedDay)}
+			<a href="/workout/{selectedDay.day_index}" class="start-workout-btn">
+				{#if dayProgress.total > 0 && dayProgress.done === dayProgress.total}
+					Review Workout
+				{:else if dayProgress.done > 0}
+					Continue Workout
+				{:else}
+					Start Workout
+				{/if}
+			</a>
+
 			<div class="exercise-list">
 				{#each selectedDay.exercises.sort((a, b) => a.order_index - b.order_index) as exercise, i}
 					<div class="exercise-card">
@@ -75,14 +110,33 @@
 						<div class="sets-table">
 							<div class="sets-header">
 								<span>Set</span>
-								<span>Reps</span>
-								<span>Weight</span>
+								<span>Target</span>
+								<span>Actual</span>
+								<span class="col-status-header"></span>
 							</div>
 							{#each exercise.sets.sort((a, b) => a.set_number - b.set_number) as set}
-								<div class="set-row">
+								{@const status = getSetStatus(set)}
+								<div class="set-row" class:completed={status === 'completed'} class:skipped={status === 'skipped'}>
 									<span class="set-num">{set.set_number}</span>
-									<span class="set-reps">{set.target_reps}</span>
-									<span class="set-weight">{formatWeight(set.target_weight, 'lb')}</span>
+									<span class="set-target">
+										{set.target_reps} × {formatWeight(set.target_weight, 'lb')}
+									</span>
+									<span class="set-actual">
+										{#if set.log && status === 'completed'}
+											{set.log.actual_reps ?? '—'} × {set.log.actual_weight != null ? `${set.log.actual_weight} lb` : '—'}
+										{:else if status === 'skipped'}
+											<span class="skipped-text">Skipped</span>
+										{:else}
+											—
+										{/if}
+									</span>
+									<span class="col-status">
+										{#if status === 'completed'}
+											<span class="status-icon completed-icon">&#10003;</span>
+										{:else if status === 'skipped'}
+											<span class="status-icon skipped-icon">&#10005;</span>
+										{/if}
+									</span>
 								</div>
 							{/each}
 						</div>
@@ -94,6 +148,25 @@
 </div>
 
 <style>
+	.start-workout-btn {
+		display: block;
+		text-align: center;
+		padding: 0.75rem;
+		margin-bottom: 1rem;
+		background: var(--color-accent);
+		color: #0a0a0a;
+		font-family: var(--font-body);
+		font-size: 0.9rem;
+		font-weight: 600;
+		border-radius: var(--radius-sm);
+		text-decoration: none;
+		transition: background 0.15s ease;
+	}
+
+	.start-workout-btn:hover {
+		background: var(--color-accent-hover);
+	}
+
 	.plan-page {
 		min-height: 100vh;
 		min-height: 100dvh;
@@ -274,6 +347,18 @@
 		font-style: italic;
 	}
 
+	.day-tab.done {
+		border-color: var(--color-accent);
+		background: rgba(34, 197, 94, 0.06);
+	}
+
+	.day-progress {
+		font-family: var(--font-display);
+		font-size: 0.55rem;
+		color: var(--color-accent);
+		letter-spacing: 0.02em;
+	}
+
 	/* Sets table */
 	.sets-table {
 		font-size: 0.82rem;
@@ -281,7 +366,7 @@
 
 	.sets-header {
 		display: grid;
-		grid-template-columns: 40px 1fr 1fr;
+		grid-template-columns: 32px 1fr 1fr 24px;
 		gap: 0.5rem;
 		padding: 0.35rem 0;
 		border-bottom: 1px solid var(--color-border);
@@ -294,14 +379,24 @@
 
 	.set-row {
 		display: grid;
-		grid-template-columns: 40px 1fr 1fr;
+		grid-template-columns: 32px 1fr 1fr 24px;
 		gap: 0.5rem;
 		padding: 0.4rem 0;
+		align-items: center;
 		border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+		transition: opacity 0.15s ease;
 	}
 
 	.set-row:last-child {
 		border-bottom: none;
+	}
+
+	.set-row.completed {
+		background: rgba(34, 197, 94, 0.04);
+	}
+
+	.set-row.skipped {
+		opacity: 0.4;
 	}
 
 	.set-num {
@@ -310,11 +405,49 @@
 		font-size: 0.75rem;
 	}
 
-	.set-reps {
-		font-weight: 500;
+	.set-target {
+		color: var(--color-text-muted);
+		font-size: 0.8rem;
 	}
 
-	.set-weight {
+	.set-actual {
+		font-weight: 500;
+		font-size: 0.8rem;
+	}
+
+	.skipped-text {
 		color: var(--color-text-muted);
+		font-style: italic;
+		font-size: 0.75rem;
+	}
+
+	.col-status-header {
+		width: 24px;
+	}
+
+	.col-status {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.status-icon {
+		font-size: 0.7rem;
+		width: 18px;
+		height: 18px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 50%;
+	}
+
+	.completed-icon {
+		color: var(--color-accent);
+		background: rgba(34, 197, 94, 0.12);
+	}
+
+	.skipped-icon {
+		color: #ef4444;
+		background: rgba(239, 68, 68, 0.1);
 	}
 </style>

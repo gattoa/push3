@@ -54,40 +54,40 @@ These decisions reduce scope without breaking the loop:
 - Fonts: Inter (body) + JetBrains Mono (display)
 
 ### Known Gaps to Address
-- Adapter is `adapter-auto`; tech-stack specifies `@sveltejs/adapter-vercel`
-- PWA uses manual service worker; tech-stack specifies `@vite-pwa/sveltekit`
-- `@anthropic-ai/sdk` not yet installed (required before Phase 2)
-- No protected route guard (unauthenticated users can access any route)
-- No ExerciseDB instance exists yet (deployed in Phase 1)
-- No Supabase schema exists yet (created in Phase 1)
+- Adapter is `adapter-auto`; tech-stack specifies `@sveltejs/adapter-vercel` (deferred to Phase 5)
+- PWA uses manual service worker; tech-stack specifies `@vite-pwa/sveltekit` (deferred to Phase 5)
+- ~~`@anthropic-ai/sdk` not yet installed~~ → Installed in Phase 2
+- ~~No protected route guard~~ → Auth guard added in `hooks.server.ts` (Phase 2)
+- ~~No ExerciseDB instance exists yet~~ → Deployed in Phase 1
+- ~~No Supabase schema exists yet~~ → Created in Phase 1
 
 ---
 
-## Phase 1: Data Model & ExerciseDB
+## Phase 1: Data Model & ExerciseDB ✅
 
 **Goal:** Stand up the Supabase schema and self-hosted ExerciseDB so all subsequent phases have a data layer and exercise catalog to build against.
-**Status:** Not Started
+**Status:** Complete
 
 ### Deliverables
 
 #### Supabase Schema
-- [ ] `user_settings` table — goals, equipment list, injuries, experience level, session duration, training days, unit preference (lb/kg)
-- [ ] `weekly_plans` table — plan metadata per user per week (week_number, status, created_at)
-- [ ] `planned_days` table — 7 days per plan with split labels (Push, Pull, Legs, Rest, etc.)
-- [ ] `planned_exercises` table — exercises assigned to each day (exercise_id, order, notes)
-- [ ] `planned_sets` table — prescribed sets with target reps and target weight (nullable for cold start)
-- [ ] `set_logs` table — actual performance: reps, weight, completed/skipped, logged_at
-- [ ] `check_ins` table — weekly check-in data: body weight, injury changes, equipment changes, notes
-- [ ] Row Level Security (RLS) policies on all tables
-- [ ] Auto-create `user_settings` row on auth.users insert (trigger)
-- [ ] Single Postgres RPC function to fetch a full plan (plan → days → exercises → sets) in one call
-- [ ] **No data deletion on week rollover.** All set logs, plans, and check-ins are retained indefinitely. The generator's quality depends on historical data depth (see architecture-plan Decision 3).
+- [x] `user_settings` table — goals, equipment list, injuries, experience level, session duration, training days, unit preference (lb/kg)
+- [x] `weekly_plans` table — plan metadata per user per week (week_number, status, created_at)
+- [x] `planned_days` table — 7 days per plan with split labels (Push, Pull, Legs, Rest, etc.)
+- [x] `planned_exercises` table — exercises assigned to each day (exercise_id, order, notes)
+- [x] `planned_sets` table — prescribed sets with target reps and target weight (nullable for cold start)
+- [x] `set_logs` table — actual performance: reps, weight, completed/skipped, logged_at
+- [x] `check_ins` table — weekly check-in data: body weight, injury changes, equipment changes, notes
+- [x] Row Level Security (RLS) policies on all tables
+- [x] Auto-create `user_settings` row on auth.users insert (trigger)
+- [x] Postgres RPC functions: `get_full_plan` (plan → days → exercises → sets → logs) and `get_generation_context` (full generation inputs)
+- [x] **No data deletion on week rollover.** All set logs, plans, and check-ins are retained indefinitely.
 
 #### ExerciseDB
-- [ ] Fork and deploy ExerciseDB v1 to Vercel as a separate project
-- [ ] Verify API endpoints: query by muscle group, query by equipment, query by exercise ID
-- [ ] Confirm GIF and instruction data is served correctly
-- [ ] Configure Vercel edge caching (`s-maxage=300, stale-while-revalidate`)
+- [x] Fork and deploy ExerciseDB v1 to Vercel as a separate project (`exercisedb-api-khaki.vercel.app`)
+- [x] Verify API endpoints: query by muscle group, query by equipment, query by exercise ID
+- [x] Confirm GIF and instruction data is served correctly
+- [ ] Configure Vercel edge caching (`s-maxage=300, stale-while-revalidate`) — using Vercel defaults; explicit config deferred
 
 ### Dependencies
 - Supabase project must be provisioned (exists from Phase 0)
@@ -100,34 +100,39 @@ These decisions reduce scope without breaking the loop:
 
 ---
 
-## Phase 2: Onboarding & First Plan Generation
+## Phase 2: Onboarding & First Plan Generation ✅
 
 **Goal:** Athlete completes onboarding, system generates Week 1 plan (cold start), athlete sees their plan. This is the first half of the loop.
-**Status:** Not Started
+**Status:** Complete
 
 ### Deliverables
 
 #### Onboarding Flow
-- [ ] Onboarding route (`/onboarding`) — multi-step form
-- [ ] Collect: goals, experience level, equipment available, training days per week, session duration, injuries
-- [ ] Save to `user_settings` on completion
-- [ ] Redirect to plan generation on submit
+- [x] Onboarding route (`/onboarding`) — 6-step form with progress bar
+- [x] Collect: goals, experience level, equipment available, training days per week, session duration, unit preference, injuries
+- [x] Save to `user_settings` on completion
+- [x] Redirect to plan generation on submit (`/plan/generate`)
 
 #### Plan Generation (Server-Side)
-- [ ] SvelteKit API route for plan generation (`/api/generate-plan`)
-- [ ] Context assembly: read `user_settings` + query ExerciseDB (filtered by equipment + injuries)
-- [ ] System prompt: coaching rules, constraints, output format (structured JSON via tool use)
-- [ ] Claude API call (synchronous) with `@anthropic-ai/sdk`
-- [ ] Validate returned plan against exercise catalog (exercise IDs exist, rep ranges reasonable)
-- [ ] Save plan to Supabase: `weekly_plans` → `planned_days` → `planned_exercises` → `planned_sets`
-- [ ] Week 1 plans prescribe no target weights (cold start per architecture decision)
-- [ ] Generation throttle: one plan per user per week
+- [x] SvelteKit API route for plan generation (`/api/generate-plan`)
+- [x] Context assembly: `get_generation_context` RPC + ExerciseDB (filtered by equipment)
+- [x] System prompt: coaching rules, constraints, output format (structured JSON via tool use)
+- [x] Claude API call (synchronous) with `@anthropic-ai/sdk`
+- [x] Validate returned plan against exercise catalog (exercise ID check, 7-day check)
+- [x] Save plan to Supabase: `weekly_plans` → `planned_days` → `planned_exercises` → `planned_sets`
+- [x] Week 1 plans prescribe no target weights (cold start per architecture decision)
+- [x] Generation throttle: one plan per user per week (unique constraint on user_id + week_number)
 
 #### Plan View
-- [ ] Plan route (`/plan`) — displays current week's plan
-- [ ] 7-day layout with day labels and exercise lists
-- [ ] Each exercise shows: name, sets × reps, target weight (or "—" for cold start)
-- [ ] Navigate to individual day detail
+- [x] Plan route (`/plan`) — displays current week's plan
+- [x] 7-day layout with day tabs and exercise lists
+- [x] Each exercise shows: name, sets × reps, target weight (or "—" for cold start)
+- [x] Day detail via inline tab selection (functionally equivalent to separate day routes)
+
+#### Additional (not in original spec)
+- [x] Auth guard in `hooks.server.ts` — redirects based on authentication and onboarding status
+- [x] Generation loading page (`/plan/generate`) with error handling and retry
+- [x] Auth callback redirects through hooks for proper routing
 
 ### Dependencies
 - Phase 1 (schema + ExerciseDB must be live)
@@ -223,7 +228,7 @@ These decisions reduce scope without breaking the loop:
 #### Scaffolding Alignment
 - [ ] Swap `adapter-auto` → `@sveltejs/adapter-vercel`
 - [ ] Evaluate migrating manual service worker to `@vite-pwa/sveltekit` (or defer to post-POC)
-- [ ] Protected route guard: redirect unauthenticated users to `/`
+- [x] Protected route guard: redirect unauthenticated users to `/` (completed in Phase 2)
 - [ ] `/auth/error` page for OAuth failures
 
 #### Multi-Week Validation
