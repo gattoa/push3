@@ -1,10 +1,28 @@
 <script lang="ts">
 	import type { FullPlanDay, FullPlanExercise, FullPlanSet } from '$lib/types/database';
+	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
 
 	let { data } = $props();
 	const day: FullPlanDay = data.day;
 	const dayIndex: number = data.dayIndex;
 	const unitPref: string = data.unitPref;
+
+	// Avatar menu
+	let showMenu = $state(false);
+	const user = $derived(page.data.user);
+	const initials = $derived(
+		user?.user_metadata?.full_name
+			? user.user_metadata.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
+			: user?.email?.[0]?.toUpperCase() ?? '?'
+	);
+	const avatarUrl = $derived(user?.user_metadata?.avatar_url ?? null);
+
+	async function signOut() {
+		showMenu = false;
+		await page.data.supabase.auth.signOut();
+		goto('/');
+	}
 
 	const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -132,6 +150,21 @@
 		<div class="header-text">
 			<h1>{DAY_NAMES[dayIndex]}, {todayDate}</h1>
 			<span class="split-label">{day.split_label}</span>
+		</div>
+		<div class="avatar-wrapper">
+			<button class="avatar-btn" onclick={() => showMenu = !showMenu} title="Account">
+				{#if avatarUrl}
+					<img src={avatarUrl} alt="Avatar" class="avatar-img" referrerpolicy="no-referrer" />
+				{:else}
+					<span class="avatar-initials">{initials}</span>
+				{/if}
+			</button>
+			{#if showMenu}
+				<div class="avatar-menu">
+					<div class="menu-user">{user?.user_metadata?.full_name ?? user?.email ?? ''}</div>
+					<button class="menu-item" onclick={signOut}>Sign Out</button>
+				</div>
+			{/if}
 		</div>
 	</header>
 
@@ -309,6 +342,85 @@
 	.header-text {
 		flex: 1;
 		min-width: 0;
+	}
+
+	/* Avatar */
+	.avatar-wrapper {
+		position: relative;
+	}
+
+	.avatar-btn {
+		width: 36px;
+		height: 36px;
+		border-radius: 50%;
+		border: 1.5px solid var(--color-border);
+		background: var(--color-surface);
+		cursor: pointer;
+		padding: 0;
+		overflow: hidden;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+		transition: border-color 0.15s ease;
+	}
+
+	.avatar-btn:hover {
+		border-color: var(--color-text-muted);
+	}
+
+	.avatar-img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+
+	.avatar-initials {
+		font-family: var(--font-display);
+		font-size: 0.7rem;
+		font-weight: 700;
+		color: var(--color-text-muted);
+	}
+
+	.avatar-menu {
+		position: absolute;
+		top: calc(100% + 6px);
+		right: 0;
+		min-width: 180px;
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+		z-index: 100;
+		overflow: hidden;
+	}
+
+	.menu-user {
+		padding: 0.75rem 1rem;
+		font-size: 0.75rem;
+		color: var(--color-text-muted);
+		border-bottom: 1px solid var(--color-border);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.menu-item {
+		display: block;
+		width: 100%;
+		padding: 0.65rem 1rem;
+		background: none;
+		border: none;
+		color: var(--color-text);
+		font-family: var(--font-body);
+		font-size: 0.85rem;
+		text-align: left;
+		cursor: pointer;
+		transition: background 0.1s ease;
+	}
+
+	.menu-item:hover {
+		background: rgba(255, 255, 255, 0.05);
 	}
 
 	.workout-header h1 {
