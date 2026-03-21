@@ -1,7 +1,7 @@
 # Push — POC Roadmap
 
 > **Scope:** Prove the end-to-end feedback loop — Onboarding → Plan Generation → Workout Logging → Check-In → Re-Generation.
-> Last updated: 2026-03-20 (Phase 4 complete)
+> Last updated: 2026-03-20 (Phase 4.1 complete)
 
 ---
 
@@ -237,6 +237,20 @@ These decisions reduce scope without breaking the loop:
 - Athlete completes check-in, receives Week 2 plan, and the plan visibly reflects their Week 1 performance
 - Target weights appear on exercises that were logged in Week 1
 - The full data chain is intact: onboarding → plan → logs → check-in → new plan
+
+---
+
+## Phase 4.1: Bug Fixes ✅
+
+**Goal:** Fix bugs discovered during Phase 4 live testing that prevented the loop from functioning correctly.
+**Status:** Complete
+
+### Fixes
+
+- [x] **ExerciseDB response mapping** — All exercise query functions (`getExercises`, `getExerciseById`, `getExercisesByBodyPart`, `getExercisesByEquipment`, `getExercisesByMuscle`) were returning raw API responses without `mapExercise()`. Raw field `exerciseId` mapped to `id: undefined`, causing deduplication to collapse 300 exercises into 1. Only `searchExercises` had the correct mapping. Fixed: all functions now apply `mapExercise()`.
+- [x] **Check-in upsert** — `createCheckIn` used `insert`, which failed with a unique constraint violation when re-submitting a check-in for the same week. Fixed: changed to `upsert` with `onConflict: 'user_id,week_number'`.
+- [x] **Check-in RLS policy** — `check_ins` table had SELECT and INSERT policies but no UPDATE policy, blocking the upsert. Fixed: added UPDATE policy.
+- [x] **Generation prompt variety rules** — Added rules 12 (no exercise repetition within a week) and 13 (diverse movement patterns) to prevent Claude from assigning the same exercise everywhere.
 
 ---
 

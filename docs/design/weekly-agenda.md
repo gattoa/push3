@@ -42,8 +42,9 @@ The weekly agenda lets users see their full week at a glance, review progress ac
 ## Design Decisions
 
 ### Header
-- **Left:** Back arrow or "← Today" — returns to `/workout` (today's view)
-- **Right:** "This Week" label (no week number — it's internal, not user-facing)
+- **Left:** "← Today" — returns to `/workout` (today's view)
+- **Center:** "This Week" label (no week number — it's internal, not user-facing)
+- **Right:** "Check-In →" link — accent-colored, navigates to `/check-in`
 
 ### Day Cards (Vertical List)
 - Full-width cards in a vertical scroll list

@@ -66,6 +66,7 @@ This is the app's home screen post-onboarding. It shows today's prescribed worko
 ### Completion Summary
 - Appears when all sets have a status (completed or skipped)
 - Shows: completed count, skipped count, total volume
+- Two action buttons: "View Weekly Plan" (secondary, → `/plan`) and "Weekly Check-In" (primary, → `/check-in`)
 
 ## States
 

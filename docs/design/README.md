@@ -7,9 +7,9 @@ Design decisions and specifications for Push, organized per-page with a shared o
 **Primary screen:** Daily Workout (`/workout`)
 **Secondary screen:** Weekly Agenda (`/plan`)
 
-Flow: App open → `/workout` (today's workout) ↔ `/plan` (weekly agenda)
+Flow: App open → `/workout` (today's workout) ↔ `/plan` (weekly agenda) → `/check-in` (end-of-week)
 
-The daily workout is what users see every time they open the app. The weekly agenda is a planning/review tool accessed via a list icon in the daily view header.
+The daily workout is what users see every time they open the app. The weekly agenda is a planning/review tool accessed via a list icon in the daily view header. The check-in is accessible from both the weekly agenda header and the workout completion summary.
 
 ## Global Design Decisions
 
@@ -38,9 +38,10 @@ The daily workout is what users see every time they open the app. The weekly age
 
 | Page | Doc | Status |
 |---|---|---|
-| Daily Workout (`/workout`) | [daily-workout.md](daily-workout.md) | In Progress |
-| Weekly Agenda (`/plan`) | [weekly-agenda.md](weekly-agenda.md) | Planned |
-| Exercise Detail (`/exercise/[id]`) | [exercise-detail.md](exercise-detail.md) | Planned |
+| Daily Workout (`/workout`) | [daily-workout.md](daily-workout.md) | Complete |
+| Weekly Agenda (`/plan`) | [weekly-agenda.md](weekly-agenda.md) | Complete |
+| Exercise Detail (`/exercise/[id]`) | [exercise-detail.md](exercise-detail.md) | Complete |
+| Weekly Check-In (`/check-in`) | [check-in.md](check-in.md) | Complete |
+| Onboarding (`/onboarding`) | [onboarding.md](onboarding.md) | Complete |
 | Login (`/`) | — | No changes planned |
-| Onboarding (`/onboarding`) | — | No changes planned |
 | Plan Generation (`/plan/generate`) | — | No changes planned |
