@@ -224,12 +224,12 @@ export async function createCheckIn(
 ): Promise<string | null> {
 	const { data, error } = await supabase
 		.from('check_ins')
-		.insert(checkIn)
+		.upsert(checkIn, { onConflict: 'user_id,week_number' })
 		.select('id')
 		.single();
 
 	if (error) {
-		console.error('Failed to insert check-in:', error.message);
+		console.error('Failed to upsert check-in:', error.message);
 		return null;
 	}
 	return data.id;

@@ -265,6 +265,10 @@ create policy "Users can insert own check-ins"
   on public.check_ins for insert
   with check (auth.uid() = user_id);
 
+create policy "Users can update own check-ins"
+  on public.check_ins for update
+  using (auth.uid() = user_id);
+
 -- ============================================================================
 -- Indexes for common query patterns
 -- ============================================================================

@@ -270,7 +270,10 @@ export async function generatePlan(
 	}
 
 	// 3. Build exercise catalog filtered by athlete's equipment
+	console.log('[generate] Equipment:', context.user_settings.equipment);
 	const catalog = await buildExerciseCatalog(context.user_settings.equipment);
+	console.log('[generate] Catalog size:', catalog.length);
+	console.log('[generate] Sample exercises:', catalog.slice(0, 10).map(e => `${e.id} — ${e.name} (${e.bodyPart}/${e.target})`));
 	if (catalog.length === 0) {
 		return { error: 'No exercises found for your equipment. Please update your profile.' };
 	}

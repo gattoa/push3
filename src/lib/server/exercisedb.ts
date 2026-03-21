@@ -48,7 +48,8 @@ async function fetchExerciseDB<T>(path: string): Promise<T> {
 
 /** Get all exercises (with optional search and pagination) */
 export async function getExercises(limit = 50, offset = 0): Promise<Exercise[]> {
-	return fetchExerciseDB<Exercise[]>(`/api/v1/exercises?limit=${limit}&offset=${offset}`);
+	const raw = await fetchExerciseDB<ExerciseDBResponse[]>(`/api/v1/exercises?limit=${limit}&offset=${offset}`);
+	return raw.map(mapExercise);
 }
 
 /** Raw shape returned by ExerciseDB v1 API */
@@ -87,28 +88,32 @@ export async function searchExercises(query: string, limit = 50, offset = 0): Pr
 
 /** Get a single exercise by ID */
 export async function getExerciseById(id: string): Promise<Exercise> {
-	return fetchExerciseDB<Exercise>(`/api/v1/exercises/${encodeURIComponent(id)}`);
+	const raw = await fetchExerciseDB<ExerciseDBResponse>(`/api/v1/exercises/${encodeURIComponent(id)}`);
+	return mapExercise(raw);
 }
 
 /** Get exercises by body part (e.g., "chest", "back", "upper legs") */
 export async function getExercisesByBodyPart(bodyPart: string, limit = 50, offset = 0): Promise<Exercise[]> {
-	return fetchExerciseDB<Exercise[]>(
+	const raw = await fetchExerciseDB<ExerciseDBResponse[]>(
 		`/api/v1/bodyparts/${encodeURIComponent(bodyPart)}/exercises?limit=${limit}&offset=${offset}`
 	);
+	return raw.map(mapExercise);
 }
 
 /** Get exercises by equipment type (e.g., "barbell", "dumbbell", "cable") */
 export async function getExercisesByEquipment(equipment: string, limit = 50, offset = 0): Promise<Exercise[]> {
-	return fetchExerciseDB<Exercise[]>(
+	const raw = await fetchExerciseDB<ExerciseDBResponse[]>(
 		`/api/v1/equipments/${encodeURIComponent(equipment)}/exercises?limit=${limit}&offset=${offset}`
 	);
+	return raw.map(mapExercise);
 }
 
 /** Get exercises by target muscle (e.g., "pectorals", "lats", "quads") */
 export async function getExercisesByMuscle(muscle: string, limit = 50, offset = 0): Promise<Exercise[]> {
-	return fetchExerciseDB<Exercise[]>(
+	const raw = await fetchExerciseDB<ExerciseDBResponse[]>(
 		`/api/v1/muscles/${encodeURIComponent(muscle)}/exercises?limit=${limit}&offset=${offset}`
 	);
+	return raw.map(mapExercise);
 }
 
 // ============================================================================
