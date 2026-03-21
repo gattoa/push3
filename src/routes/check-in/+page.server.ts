@@ -94,17 +94,27 @@ export const actions: Actions = {
 		}
 
 		// 2. Update user_settings with current injuries and equipment
-		await updateUserSettings(supabase, user.id, {
+		const settingsResult = await updateUserSettings(supabase, user.id, {
 			injuries: newInjuries,
 			equipment: newEquipment
 		});
 
+		if (!settingsResult) {
+			console.error('[check-in] Failed to update user_settings for user', user.id);
+			return fail(500, { error: 'Failed to update settings. Check-in was saved — please try again.' });
+		}
+
 		// 3. Mark current plan as completed
-		await supabase
+		const { error: planError } = await supabase
 			.from('weekly_plans')
 			.update({ status: 'completed' })
 			.eq('user_id', user.id)
 			.eq('week_number', weekNumber);
+
+		if (planError) {
+			console.error('[check-in] Failed to mark plan completed:', planError.message);
+			return fail(500, { error: 'Failed to finalize plan. Check-in was saved — please try again.' });
+		}
 
 		// 4. Redirect to plan generation
 		redirect(303, '/plan/generate');

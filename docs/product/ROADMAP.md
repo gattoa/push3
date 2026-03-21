@@ -1,7 +1,7 @@
 # Push — POC Roadmap
 
 > **Scope:** Prove the end-to-end feedback loop — Onboarding → Plan Generation → Workout Logging → Check-In → Re-Generation.
-> Last updated: 2026-03-20 (Phase 4.1 complete)
+> Last updated: 2026-03-21 (Phase 5 in progress)
 
 ---
 
@@ -257,15 +257,15 @@ These decisions reduce scope without breaking the loop:
 ## Phase 5: Loop Polish & Validation
 
 **Goal:** Refine the end-to-end experience, fix gaps discovered during testing, confirm the loop holds across multiple cycles.
-**Status:** Not Started
+**Status:** In Progress
 
 ### Deliverables
 
 #### Scaffolding Alignment
-- [ ] Swap `adapter-auto` → `@sveltejs/adapter-vercel`
+- [x] Swap `adapter-auto` → `@sveltejs/adapter-vercel` (runtime: `nodejs22.x`)
 - [ ] Evaluate migrating manual service worker to `@vite-pwa/sveltekit` (or defer to post-POC)
 - [x] Protected route guard: redirect unauthenticated users to `/` (completed in Phase 2)
-- [ ] `/auth/error` page for OAuth failures
+- [x] `/auth/error` page for OAuth failures — displays error reason from callback, links back to sign-in
 
 #### Multi-Week Validation
 - [ ] Run through 3 complete weekly cycles with test data
@@ -280,9 +280,9 @@ These decisions reduce scope without breaking the loop:
 - [ ] First-time exercise in Week 2+ plan — no target weight until baseline established
 
 #### Error Handling
-- [ ] Claude API failure: graceful error with retry
-- [ ] Supabase write failure: user-facing error, no silent data loss
-- [ ] ExerciseDB unreachable: fallback or clear error
+- [x] Claude API failure: graceful error with retry (already existed in `/plan/generate` UI; API endpoint now catches unhandled errors)
+- [x] Supabase write failure: user-facing error, no silent data loss (check-in form action now surfaces settings update and plan completion failures)
+- [x] ExerciseDB unreachable: request timeout (10s), per-equipment error isolation, clear error message propagated to user via generation page
 
 ### Dependencies
 - Phase 4 (complete loop must exist)

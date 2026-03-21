@@ -23,23 +23,40 @@ interface NamedItem {
 	name: string;
 }
 
+/** Default timeout for ExerciseDB requests (10 seconds) */
+const FETCH_TIMEOUT_MS = 10_000;
+
 async function fetchExerciseDB<T>(path: string): Promise<T> {
 	const url = `${BASE_URL}${path}`;
-	const response = await fetch(url, {
-		headers: { 'Accept': 'application/json' }
-	});
 
-	if (!response.ok) {
-		throw new Error(`ExerciseDB request failed: ${response.status} ${response.statusText} — ${url}`);
+	const controller = new AbortController();
+	const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+	try {
+		const response = await fetch(url, {
+			headers: { 'Accept': 'application/json' },
+			signal: controller.signal
+		});
+
+		if (!response.ok) {
+			throw new Error(`ExerciseDB request failed: ${response.status} ${response.statusText} — ${url}`);
+		}
+
+		const body: ApiResponse<T> = await response.json();
+
+		if (!body.success) {
+			throw new Error(`ExerciseDB returned success=false — ${url}`);
+		}
+
+		return body.data;
+	} catch (e) {
+		if (e instanceof DOMException && e.name === 'AbortError') {
+			throw new Error(`ExerciseDB request timed out after ${FETCH_TIMEOUT_MS}ms — ${url}`);
+		}
+		throw e;
+	} finally {
+		clearTimeout(timeout);
 	}
-
-	const body: ApiResponse<T> = await response.json();
-
-	if (!body.success) {
-		throw new Error(`ExerciseDB returned success=false — ${url}`);
-	}
-
-	return body.data;
 }
 
 // ============================================================================
