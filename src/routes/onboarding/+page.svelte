@@ -257,7 +257,7 @@
 		min-height: 100dvh;
 		display: flex;
 		flex-direction: column;
-		padding: 1rem 1.5rem 2rem;
+		padding: calc(var(--safe-top) + 1rem) 1.5rem calc(var(--safe-bottom) + 2rem);
 		max-width: 480px;
 		margin: 0 auto;
 	}

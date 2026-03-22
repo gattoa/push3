@@ -24,7 +24,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		padding: 2rem;
+		padding: calc(var(--safe-top) + 2rem) 2rem calc(var(--safe-bottom) + 2rem);
 		background: var(--color-bg);
 	}
 

@@ -93,7 +93,7 @@
 	.agenda-page {
 		min-height: 100vh;
 		min-height: 100dvh;
-		padding: 1rem 1rem 2rem;
+		padding: calc(var(--safe-top) + 1rem) 1rem calc(var(--safe-bottom) + 2rem);
 		max-width: 480px;
 		margin: 0 auto;
 	}

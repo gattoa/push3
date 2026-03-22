@@ -89,6 +89,8 @@
 		min-height: 100dvh;
 		overflow: hidden;
 		background: var(--color-bg);
+		padding-top: var(--safe-top);
+		padding-bottom: var(--safe-bottom);
 	}
 
 	/* Ambient glow effects */
