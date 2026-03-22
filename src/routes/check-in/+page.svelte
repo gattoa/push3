@@ -147,7 +147,7 @@
 	.checkin-page {
 		min-height: 100vh;
 		min-height: 100dvh;
-		padding: 1rem 1rem 4rem;
+		padding: calc(var(--safe-top) + 1rem) 1rem calc(var(--safe-bottom) + 4rem);
 		max-width: 480px;
 		margin: 0 auto;
 	}
