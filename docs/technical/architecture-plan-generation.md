@@ -109,13 +109,15 @@ Client (plan-generator.ts)
 
 **Impact:** Eliminates the scaling ceiling entirely. Exercise catalog queries become internal calls to our own infrastructure with no rate limits and no third-party dependency on the generation hot path.
 
-### Decision 2: One Claude Call Per User Per Week via Batch API
+### Decision 2: One Claude Call Per User Per Week
 
-**Decision:** Use Claude's Batch API (~$0.04/user/week) as the default for plan generation, with synchronous fallback when timing requires it.
+**Decision:** Use synchronous Claude API calls for plan generation (~$0.08/user/week at standard pricing).
 
-**Rationale:** Claude's value is in coaching intelligence — interpreting performance trends, recognizing plateaus, adjusting programming based on adherence patterns, and reasoning about the athlete holistically. This justifies its cost only when fed rich historical context, not as a stateless template filler. The Batch API provides a 50% cost reduction for asynchronous processing.
+**Rationale:** Claude's value is in coaching intelligence — interpreting performance trends, recognizing plateaus, adjusting programming based on adherence patterns, and reasoning about the athlete holistically. This justifies its cost only when fed rich historical context, not as a stateless template filler.
 
-**Hybrid async/sync model:** Since the check-in day is configurable per user, plan generation is triggered at varying times. The Batch API is used by default (request submitted on check-in, result returned within 24 hours). If the athlete's next training day falls within 24 hours of check-in, the system falls back to the synchronous API to ensure the plan is ready in time.
+**Current implementation:** Plan generation uses the synchronous Claude API, triggered immediately when the athlete completes a check-in. The plan is generated in real-time and available within seconds.
+
+**Future optimization:** The Claude Batch API (50% cost reduction) could be introduced later for users whose check-in timing allows a 24-hour processing window. This is deferred until scale justifies the added complexity of async job management and status polling.
 
 **Estimated cost per call:**
 
@@ -132,13 +134,15 @@ Client (plan-generator.ts)
 | **Total input** | **~7,750** |
 | **Total output** (7 days + ~18 exercises + ~54 sets as structured JSON) | **~3,500** |
 
-**Cost at scale (Batch API — 50% discount):**
+**Cost at scale (synchronous API — standard pricing):**
 
 | Users | Weekly | Monthly |
 |---|---|---|
-| 100 | $4 | $16 |
-| 1,000 | $40 | $160 |
-| 10,000 | $400 | $1,600 |
+| 100 | $8 | $32 |
+| 1,000 | $80 | $320 |
+| 10,000 | $800 | $3,200 |
+
+> **Future optimization:** Batch API would halve these costs. Deferred until user volume justifies the async infrastructure.
 
 ### Decision 3: History Is Never Destroyed
 
@@ -168,11 +172,11 @@ Client (plan-generator.ts)
 
 **Rationale:** The current system has Claude guess conservative starting weights with no data basis. This produces arbitrary numbers that erode athlete trust. By leaving target weights unset for new exercises, the athlete logs their actual working weight, establishing a real baseline. From Week 2 onward, the generator prescribes targets grounded in data — progressive overload recommendations derived from actual performance trends.
 
-### Decision 6: Hybrid Async/Sync Generation Based on Check-In Timing
+### Decision 6: Synchronous Generation on Check-In
 
-**Decision:** Default to Batch API; fall back to synchronous API when the athlete's next training day is within 24 hours of check-in.
+**Decision:** Plan generation runs synchronously when the athlete completes their check-in. The plan is available immediately.
 
-**Rationale:** The Batch API's 50% cost savings apply to the majority of users whose check-in timing allows a 24-hour processing window. For edge cases (e.g., athlete checks in Monday morning and trains Monday evening), the synchronous API ensures the plan is ready immediately. This keeps the default cost low while preserving responsiveness when needed.
+**Rationale:** Synchronous generation keeps the UX simple — the athlete checks in, sees a loading state, and receives their new plan within seconds. This eliminates the need for async job management, status polling, and edge-case handling around training day proximity. Batch API is a future cost optimization, not a current requirement.
 
 ---
 
@@ -186,10 +190,9 @@ Weekly Check-In (athlete completes — configurable day)
   → Archive current week's set_logs (never delete)
   → Trigger plan generation
 
-Plan Generation (once per week per user)
+Plan Generation (once per week per user — synchronous)
   → Assemble full context server-side from Supabase + self-hosted ExerciseDB
-  → Determine sync vs. batch based on next training day proximity
-  → Submit to Claude (Batch API or synchronous)
+  → Submit to Claude (synchronous API)
   → Validate returned plan against exercise catalog and constraints
   → Save new plan to Supabase
 
