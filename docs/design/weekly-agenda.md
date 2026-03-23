@@ -1,10 +1,10 @@
 # Weekly Agenda — `/plan`
 
-> Secondary screen. Planning and review tool for the full week.
+> Secondary screen within the Workout tab. Planning and review tool for the full week.
 
 ## Role
 
-The weekly agenda lets users see their full week at a glance, review progress across days, and navigate to a specific day's workout. Accessed from the daily workout view via a list icon.
+The weekly agenda lets users see their full week at a glance, review progress across days, and navigate to a specific day's workout. Accessed from the daily workout view via the header list icon. Also serves as the destination for the plan review banner — where the user reviews and can edit their new weekly plan.
 
 ## Layout
 
@@ -44,7 +44,7 @@ The weekly agenda lets users see their full week at a glance, review progress ac
 ### Header
 - **Left:** "← Today" — returns to `/workout` (today's view)
 - **Center:** "This Week" label (no week number — it's internal, not user-facing)
-- **Right:** "Check-In →" link — accent-colored, navigates to `/check-in`
+- No check-in link in header — check-in is triggered via a contextual banner on the Workout tab (see [daily-workout.md](daily-workout.md) Banner System)
 
 ### Day Cards (Vertical List)
 - Full-width cards in a vertical scroll list
@@ -62,6 +62,11 @@ The weekly agenda lets users see their full week at a glance, review progress ac
 - Completed days get a checkmark icon
 - Color coding: accent green for progress, muted for untouched
 
+### Plan Review Destination
+- When the user taps the plan review banner on `/workout`, they land here.
+- In plan review context, the agenda shows the newly generated week: training days, splits, exercise counts, and any editable elements.
+- No special "review mode" — the agenda itself is the review experience.
+
 ### Future: Day Reordering
 - Planned but not in initial implementation
 - Cards should be designed with drag handles in mind for later addition
@@ -71,6 +76,7 @@ The weekly agenda lets users see their full week at a glance, review progress ac
 | State | Description |
 |---|---|
 | **Active Week** | Plan exists. All 7 days shown with current progress. |
+| **Plan Review** | User arrived via plan review banner. Same layout, but plan is freshly generated with no progress yet. |
 | **No Plan** | No active plan. Show empty state or redirect to generation. |
 
 ## Open Questions (Deferred — post-POC)

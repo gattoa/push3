@@ -61,7 +61,7 @@ The check-in captures how the athlete's week went and what's changed. It feeds t
 ## Design Decisions
 
 ### Header
-- **Left:** "← Back" — returns to `/plan`
+- **Left:** "← Back" — returns to `/workout` (user arrives via banner on Workout tab)
 - **Right:** "Week N Check-In" — current plan's week number
 
 ### Week Summary
@@ -83,11 +83,12 @@ The check-in captures how the athlete's week went and what's changed. It feeds t
 3. Mark current `weekly_plans` row as `completed`
 4. Redirect to `/plan/generate` (triggers AI plan generation for next week)
 
-## Entry Points
+## Entry Point
 
-Users reach the check-in from two places:
-- **Weekly agenda:** "Check-In →" link in the `/plan` header
-- **Workout complete:** "Weekly Check-In" button in the completion summary card on `/workout`
+Users reach the check-in from a single entry point:
+- **Check-in banner** on the Workout tab (`/workout`). Appears when the check-in day arrives (Sunday for POC; configurable post-POC), regardless of whether all training days are complete. Persists 48 hours or until dismissed. See [daily-workout.md](daily-workout.md) Banner System.
+
+Previous entry points (agenda header link, workout completion button) have been removed to reduce duplication and consolidate the check-in trigger into the banner system.
 
 ## States
 
