@@ -49,6 +49,6 @@ See [UX-DESIGN-BRIEF.md](UX-DESIGN-BRIEF.md) Section 4 and Section 8 (Cluster A 
 | Exercise Detail (`/exercise/[id]`) | [exercise-detail.md](exercise-detail.md) | Current |
 | Weekly Check-In (`/check-in`) | [check-in.md](check-in.md) | Current (v0.2.0 — entry point consolidated to banner-only) |
 | Onboarding (`/onboarding`) | [onboarding.md](onboarding.md) | Current (v0.2.0 — reordered steps, DOB + gender, unit pref removed, injury yes/no gate, schema reqs) |
-| Progress (`/progress`) | — | New screen — design spec TBD |
+| Progress (`/progress`) | [progress.md](progress.md) | Current |
 | Login (`/`) | — | No changes planned |
 | Plan Generation (`/plan/generate`) | — | No changes planned |

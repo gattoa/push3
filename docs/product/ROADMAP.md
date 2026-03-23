@@ -1,7 +1,9 @@
-# Push — POC Roadmap
+# Push — Product Roadmap
 
-> **Scope:** Prove the end-to-end feedback loop — Onboarding → Plan Generation → Workout Logging → Check-In → Re-Generation.
-> Last updated: 2026-03-21 (Phase 5 in progress)
+> Last updated: 2026-03-23
+>
+> **POC** (Phases 0–5): Prove the end-to-end feedback loop. ✅ Complete.
+> **MLP** (Phases 6+): Make the loop worth using daily. 🔄 Planning.
 
 ---
 
@@ -254,49 +256,231 @@ These decisions reduce scope without breaking the loop:
 
 ---
 
-## Phase 5: Loop Polish & Validation
+## Phase 5: Loop Polish & Validation ✅
 
-**Goal:** Refine the end-to-end experience, fix gaps discovered during testing, confirm the loop holds across multiple cycles.
-**Status:** In Progress
+**Goal:** Refine the end-to-end experience and fix gaps discovered during testing.
+**Status:** Complete — remaining validation items (multi-week cycles, edge cases) are ongoing MLP concerns, not POC blockers.
 
 ### Deliverables
 
 #### Scaffolding Alignment
 - [x] Swap `adapter-auto` → `@sveltejs/adapter-vercel` (runtime: `nodejs22.x`)
-- [ ] Evaluate migrating manual service worker to `@vite-pwa/sveltekit` (or defer to post-POC)
 - [x] Protected route guard: redirect unauthenticated users to `/` (completed in Phase 2)
 - [x] `/auth/error` page for OAuth failures — displays error reason from callback, links back to sign-in
 
-#### Multi-Week Validation
-- [ ] Run through 3 complete weekly cycles with test data
-- [ ] Verify plan quality improves with accumulated data
-- [ ] Verify historical set logs accumulate correctly (no data loss on week rollover)
-- [ ] Verify check-in history builds over time
-
-#### Edge Cases
-- [ ] Athlete skips entire workout days — next plan accounts for missed volume
-- [ ] Athlete partially completes sets — partial data feeds generation correctly
-- [ ] Athlete changes equipment or reports new injury at check-in — next plan respects constraints
-- [ ] First-time exercise in Week 2+ plan — no target weight until baseline established
-
 #### Error Handling
-- [x] Claude API failure: graceful error with retry (already existed in `/plan/generate` UI; API endpoint now catches unhandled errors)
-- [x] Supabase write failure: user-facing error, no silent data loss (check-in form action now surfaces settings update and plan completion failures)
-- [x] ExerciseDB unreachable: request timeout (10s), per-equipment error isolation, clear error message propagated to user via generation page
+- [x] Claude API failure: graceful error with retry
+- [x] Supabase write failure: user-facing error, no silent data loss
+- [x] ExerciseDB unreachable: request timeout (10s), per-equipment error isolation, clear error message
 
-### Dependencies
-- Phase 4 (complete loop must exist)
+### POC Exit Criteria — Met
+The POC proved the feedback loop works end-to-end: onboarding → generation → logging → check-in → informed re-generation. Multi-week quality validation and edge case hardening continue as part of MLP work.
 
-### Exit Criteria
-- 3 consecutive weekly cycles complete without data loss or generation failures
-- Plans demonstrably improve across cycles
-- All edge cases handled without breaking the loop
+---
+
+# Minimum Lovable Product (MLP)
+
+## MLP Objective
+
+Transform the proven feedback loop into an app athletes want to use daily. The POC validated that the loop *works*; the MLP makes it *good* — polished enough to retain early users through their first month of training.
+
+### What "Lovable" Means
+
+An athlete can:
+1. Onboard in under 2 minutes and receive a plan that feels personalized
+2. Log workouts with minimal friction, seeing their history and progress as they go
+3. Trust the AI coach — plans visibly adapt, weights progress, and exercises rotate intelligently
+4. Complete the weekly cycle (train → check-in → new plan) without confusion or dead ends
+5. See their progress over time — not just follow instructions blindly
+
+---
+
+## MLP Candidate Backlog
+
+Features drawn from design specs, research recommendations, and gaps identified during the POC. **Not yet scoped or sequenced** — these are candidates to be prioritized into MLP phases.
+
+### From Design Specs (designed but not built)
+
+| Feature | Source Doc | Notes |
+|---|---|---|
+| Onboarding: DOB + gender, reordered flow | `onboarding.md` | Doc is ahead of code. Adds demographic-aware AI coaching. Requires new DB columns. |
+| Exercise swaps | `daily-workout.md`, UX Brief Cluster B | Pre-generated alternatives, swap UI during workout. Key differentiator per research. |
+| Historical performance display ("Last: weight×reps") | `daily-workout.md` | Data exists in generation context but not surfaced in workout UI. |
+| PR icon on personal records | `daily-workout.md` | Visual celebration when athlete sets a new personal best. |
+| Completion summary | `daily-workout.md` | Post-workout summary card when all sets are done. |
+| Progress tab | Design README (nav architecture) | Referenced as second nav tab. No spec, no route, no code. **Needs a design spec.** |
+| Banner system refinements | `daily-workout.md` | 48hr persistence, max-one-at-a-time arbitration, dismiss logic. |
+| Plan review destination | `weekly-agenda.md` | Newly generated week preview before athlete starts training. |
+
+### From Research Recommendations
+
+| Feature | Research Finding | Notes |
+|---|---|---|
+| Week 1 critical engagement design | 77% drop within 3 days without engagement; Week 1 predicts 6-month retention | Optimize first-week experience: quick wins, encouragement, low friction. |
+| Review Day (streak + celebration + preview) | Retention drivers: streak visibility, positive reinforcement, next-week anticipation | End-of-week experience beyond just the check-in form. |
+| Autoregulated deloads | Exercise science: periodization and recovery signals | AI detects fatigue/plateau patterns, prescribes lighter weeks. |
+| Injury exclusions in generation | Safety is make-or-break (LLM hallucination risk) | Current prompt mentions injuries but exclusion logic is basic. Needs robust filtering. |
+| Calibrated celebrations | Fitness-level appropriate feedback | Beginner PRs ≠ advanced PRs. Avoid patronizing or unrealistic praise. |
+| Accessibility standards | Inclusive design | Touch targets, contrast ratios, screen reader support. |
+
+### From POC Simplifications (deferred but relevant to MLP)
+
+| Feature | POC Rationale for Deferral | MLP Relevance |
+|---|---|---|
+| PWA offline + background sync | Loop works online-only | Gym environments have poor connectivity. Critical for daily use. |
+| Configurable check-in day | Fixed Sunday simplified week boundary | Athletes train on different schedules. |
+| Progress photos | Secondary signal | Visual progress is a major retention driver. |
+| Dual logging (quick + granular) | Single path captures required data | Quick-complete for easy sets reduces friction. |
+| Plan review celebration UX | POC validates adaptation, not presentation | First impression of the new plan matters for retention. |
+| AI rationale captions | Not required to prove loop | "Why this exercise?" builds trust in the AI coach. |
+| Service worker migration (`@vite-pwa/sveltekit`) | Manual SW was sufficient for POC | Proper PWA tooling needed for offline, caching, update prompts. |
+
+### Technical Foundations (not user-facing but MLP-enabling)
+
+| Item | Notes |
+|---|---|
+| Test coverage | Zero tests today. Set logging, generation, and check-in flows need at minimum integration tests. |
+| API rate limiting | `/api/generate-plan` calls Claude with no throttling. Cost exposure risk at scale. |
+| Input validation | API routes accept POST bodies without schema validation. |
+| Analytics / telemetry | No way to measure engagement, retention, or plan quality. |
+
+---
+
+## MLP Phases
+
+Sequencing principle: fix the front door first (easy win), then polish daily use, then land generation changes while the codebase is still close to current shape, then add new screens last (purely additive, lowest risk).
+
+Each phase is independently branchable and deployable.
+
+---
+
+### Phase 6: Onboarding Overhaul
+
+**Goal:** Align onboarding code to the design spec. Collect demographics for smarter AI coaching.
+**Branch:** `feature/onboarding-overhaul`
+
+| Deliverable | Source | Notes |
+|---|---|---|
+| DOB + gender fields | `onboarding.md` | New Step 1: date picker + gender chips. Requires DB migration (`date_of_birth`, `gender` columns). |
+| Step reorder | `onboarding.md` | About You → Experience → Goals → Equipment → Schedule → Injuries |
+| Remove unit preference step | `onboarding.md` | Default to `lb`. Changeable in Progress tab settings (Phase 9). |
+| Injury yes/no gate | `onboarding.md` | Binary choice → expand if yes. If no → "Generate My Plan" immediately. |
+| Demographic-aware generation prompt | `onboarding.md` | Seniors (60+): intensity caps, functional movement. Under-18: bodyweight/machine priority. Gender-informed volume. **Requires isolated prompt testing.** |
+
+**Technical (threaded):**
+- DB migration for new columns
+- Type updates (`UserSettings`, `UserSettingsUpdate`)
+- Input validation on onboarding form action
+
+**Exit criteria:**
+- New user completes onboarding in under 2 minutes
+- DOB and gender are captured and persisted
+- Generation prompt produces age/gender-appropriate plans (validated via prompt testing)
+- Unit preference no longer appears in onboarding flow
+
+---
+
+### Phase 7: Workout Experience
+
+**Goal:** Make the daily workout feel polished and informative — not just functional.
+**Branch:** `feature/workout-polish`
+
+| Deliverable | Source | Notes |
+|---|---|---|
+| Historical performance display | `daily-workout.md` | "Last: 135×8" below exercise name. Data exists in generation context — needs to be surfaced in workout UI. |
+| PR detection and icon | `daily-workout.md` | Estimated 1RM via Epley formula. Compare against user's all-time best per exercise. Accent icon on the set row. |
+| Completion summary card | `daily-workout.md` | Appears when all sets have status. Shows completed/skipped counts + total volume. CTA: "View Weekly Plan." |
+| Banner system | `daily-workout.md` | Plan review banner (after generation) + check-in banner (on check-in day). 48hr persistence, max one at a time, dismiss logic. |
+
+**Technical (threaded):**
+- Input validation on `/api/log-set` (schema validation for set log payloads)
+
+**Exit criteria:**
+- Athlete sees their last performance for recurring exercises
+- PR icon appears when a personal best is set
+- Workout completion shows a summary card
+- Banners appear at the right times and dismiss correctly
+
+---
+
+### Phase 8: Exercise Intelligence
+
+**Goal:** Build trust in the AI coach by giving athletes control and transparency. Lands generation/schema changes while codebase is close to current shape.
+**Branch:** `feature/exercise-intelligence`
+
+| Deliverable | Source | Notes |
+|---|---|---|
+| Pre-generated swap alternatives | `daily-workout.md` | During plan generation, AI produces 3 alternatives per exercise. Stored in `planned_exercises.alternatives` (JSON array). |
+| Swap UI | `daily-workout.md` | Swipe left on exercise card → inline expansion with 3 alternatives. Tap to replace. Sets reset. |
+| Swap fallback | `daily-workout.md` | ExerciseDB query (same muscle + user equipment − current day exercises) if pre-generated alternatives unavailable. |
+| AI rationale captions | Backlog | "Why this exercise?" — brief coach note per exercise. Stored during generation. |
+| Injury exclusion hardening | Research | Robust filtering: exercises targeting injured body regions excluded at generation time, not just mentioned in prompt. |
+
+**Technical (threaded):**
+- Schema change: `planned_exercises.alternatives` column (jsonb)
+- Schema change: `planned_exercises.rationale` column (text, nullable)
+- Generation prompt updates for alternatives + rationale output
+- API rate limiting on `/api/generate-plan`
+
+**Exit criteria:**
+- Every generated exercise has 3 pre-generated alternatives
+- Athlete can swap an exercise mid-workout without leaving the screen
+- AI rationale visible per exercise
+- Injured body regions produce zero exercises targeting those areas
+
+---
+
+### Phase 9: Progress Tab & Navigation
+
+**Goal:** Give athletes a reason to open the app on rest days. Surface their trajectory. Purely additive — new route, new UI, reads from existing data.
+**Branch:** `feature/progress-tab`
+
+| Deliverable | Source | Notes |
+|---|---|---|
+| Persistent bottom nav | `progress.md`, Design README | Two-tab bar: Workout + Progress. Visible on all authenticated routes. |
+| Streak & summary section | `progress.md` | Consecutive completed weeks + all-time totals (workouts, volume). |
+| Body weight trend | `progress.md` | Sparkline from `check_ins.body_weight`. Empty state for Week 1. |
+| Personal records list | `progress.md` | Estimated 1RM per exercise (Epley). Top PRs sorted descending. "See all" expands full list. |
+| Training calendar | `progress.md` | Month grid with trained/rest dots. Tap for mini-summary. |
+| Settings page | `progress.md` | `/progress/settings` — unit preference, training days, session duration, sign out. |
+
+**Technical (threaded):**
+- Consider `get_progress_summary` RPC if client-side aggregation is slow
+- Analytics: basic page-view tracking to measure engagement
+
+**Exit criteria:**
+- Bottom nav works across all routes, highlights active tab
+- Progress tab loads with real data from existing tables
+- Settings changes persist and take effect on next plan generation
+- Cold start / empty states render gracefully
+
+---
+
+### Post-MLP Backlog
+
+Features deferred beyond MLP. Revisit after Phase 9 based on user feedback and engagement data.
+
+| Feature | Notes |
+|---|---|
+| PWA offline + background sync | Requires service worker migration (`@vite-pwa/sveltekit`). Critical for gym use but significant infrastructure work. |
+| Configurable check-in day | Requires week boundary logic refactor. |
+| Progress photos | Needs storage (Supabase Storage), upload UI, and privacy considerations. |
+| Dual logging (quick + granular) | Quick-complete for easy sets. UX design needed. |
+| Review Day experience | Streak celebration + next-week preview. Builds on Progress tab data. |
+| Week 1 engagement design | Onboarding follow-up: first-workout encouragement, quick wins, guided experience. |
+| Autoregulated deloads | AI detects fatigue/plateau patterns. Requires multi-week data analysis. |
+| Calibrated celebrations | Fitness-level-appropriate feedback. Builds on PR system. |
+| Plan review celebration UX | Polished new-plan reveal. Builds on banner system. |
+| Accessibility audit | Touch targets, contrast ratios, screen reader support. |
+| Batch API migration | Cost optimization for plan generation. |
+| Test coverage | Integration tests for critical flows (logging, generation, check-in). |
+| Analytics / telemetry | Measure engagement, retention, plan quality. |
 
 ---
 
 ## Schema Reference
 
-From architecture-plan-generation.md (source of truth):
+From `architecture-plan-generation.md` (source of truth):
 
 ```
 user_settings
@@ -328,20 +512,3 @@ check_ins
 ├── body_weight, injury_changes, equipment_changes, notes
 ├── created_at
 ```
-
----
-
-## What's Deferred (Post-POC)
-
-| Feature | Why Deferred |
-|---|---|
-| Batch API + plan-ready notification | Cost optimization; synchronous proves the loop |
-| Progress photos | Secondary signal; not required for plan quality validation |
-| Equipment swaps mid-workout | Differentiation feature; not part of core loop |
-| PWA offline + background sync | Infrastructure concern; loop works online-only |
-| Plan Review celebration UX | Polish; POC validates adaptation, not presentation |
-| Dual logging (quick + granular) | UX refinement; single path captures required data |
-| Configurable check-in day | Simplification; fixed Sunday boundary |
-| ~~Navigation pattern design~~ | ~~TBD~~ → Addressed in Phase 3.1 (daily-first navigation) |
-| ~~ExerciseDB GIFs in exercise detail~~ | ~~Nice-to-have~~ → Addressed in Phase 3.1 (`/exercise/[id]` page with GIFs) |
-| AI rationale captions | Polish; not required to prove the loop |
