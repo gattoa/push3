@@ -5,20 +5,21 @@
 	const totalSteps = 6;
 
 	// Form state
-	let goals = $state('');
+	let dateOfBirth = $state('');
+	let gender = $state('');
 	let experienceLevel = $state('');
+	let goals = $state('');
 	let equipment = $state<string[]>([]);
 	let trainingDays = $state(4);
 	let sessionDuration = $state(60);
+	let hasInjuries = $state<boolean | null>(null);
 	let injuries = $state('');
-	let unitPref = $state<'lb' | 'kg'>('lb');
 	let submitting = $state(false);
 
-	const goalOptions = [
-		{ value: 'build_muscle', label: 'Build Muscle', desc: 'Hypertrophy-focused programming' },
-		{ value: 'build_strength', label: 'Build Strength', desc: 'Strength-focused with progressive overload' },
-		{ value: 'lose_fat', label: 'Lose Fat', desc: 'Higher volume, metabolic conditioning' },
-		{ value: 'general_fitness', label: 'General Fitness', desc: 'Balanced strength and conditioning' }
+	const genderOptions = [
+		{ value: 'male', label: 'Male' },
+		{ value: 'female', label: 'Female' },
+		{ value: 'prefer_not_to_say', label: 'Prefer not to say' }
 	];
 
 	const experienceOptions = [
@@ -27,11 +28,33 @@
 		{ value: 'advanced', label: 'Advanced', desc: '3+ years with structured programming' }
 	];
 
-	const equipmentOptions = [
-		'barbell', 'dumbbell', 'cable', 'machine', 'bodyweight',
-		'kettlebell', 'resistance band', 'ez barbell', 'smith machine',
-		'pull-up bar', 'bench', 'squat rack'
+	const goalOptions = [
+		{ value: 'build_muscle', label: 'Build Muscle', desc: 'Hypertrophy-focused programming' },
+		{ value: 'build_strength', label: 'Build Strength', desc: 'Strength-focused with progressive overload' },
+		{ value: 'lose_fat', label: 'Lose Fat', desc: 'Higher volume, metabolic conditioning' },
+		{ value: 'general_fitness', label: 'General Fitness', desc: 'Balanced strength and conditioning' }
 	];
+
+	const equipmentOptions = [
+		// Free weights
+		'barbell', 'dumbbell', 'ez barbell', 'kettlebell',
+		// Stations
+		'cable', 'machine', 'smith machine',
+		// Furniture
+		'bench', 'squat rack', 'pull-up bar',
+		// Minimal
+		'resistance band'
+	];
+
+	function selectAllEquipment() {
+		equipment = [...equipmentOptions];
+	}
+
+	function deselectAllEquipment() {
+		equipment = [];
+	}
+
+	let allSelected = $derived(equipment.length === equipmentOptions.length);
 
 	const durationOptions = [30, 45, 60, 75, 90];
 
@@ -52,13 +75,18 @@
 	}
 
 	let canAdvance = $derived(
-		step === 1 ? goals !== '' :
+		step === 1 ? dateOfBirth !== '' && gender !== '' :
 		step === 2 ? experienceLevel !== '' :
-		step === 3 ? equipment.length > 0 :
-		step === 4 ? true :
+		step === 3 ? goals !== '' :
+		step === 4 ? equipment.length > 0 :
 		step === 5 ? true :
+		step === 6 ? hasInjuries !== null :
 		true
 	);
+
+	// On the injury step, if user selects "No", the form should submit directly
+	let isFinalStep = $derived(step === totalSteps);
+	let showSubmit = $derived(isFinalStep);
 </script>
 
 <svelte:head>
@@ -83,33 +111,49 @@
 		}}
 	>
 		<!-- Hidden fields to persist all state on submit -->
-		<input type="hidden" name="goals" value={goals} />
+		<input type="hidden" name="date_of_birth" value={dateOfBirth} />
+		<input type="hidden" name="gender" value={gender} />
 		<input type="hidden" name="experience_level" value={experienceLevel} />
+		<input type="hidden" name="goals" value={goals} />
 		{#each equipment as eq}
 			<input type="hidden" name="equipment" value={eq} />
 		{/each}
 		<input type="hidden" name="training_days_per_week" value={trainingDays} />
 		<input type="hidden" name="session_duration_minutes" value={sessionDuration} />
-		<input type="hidden" name="injuries" value={injuries} />
-		<input type="hidden" name="unit_pref" value={unitPref} />
+		<input type="hidden" name="injuries" value={hasInjuries ? injuries : ''} />
+		<input type="hidden" name="unit_pref" value="lb" />
 
 		<div class="step-content">
-			<!-- Step 1: Goals -->
+			<!-- Step 1: About You (DOB + Gender) -->
 			{#if step === 1}
-				<h2>What's your primary goal?</h2>
-				<p class="step-desc">This shapes your training split, volume, and intensity.</p>
-				<div class="option-grid">
-					{#each goalOptions as opt}
-						<button
-							type="button"
-							class="option-card"
-							class:selected={goals === opt.value}
-							onclick={() => goals = opt.value}
-						>
-							<span class="option-label">{opt.label}</span>
-							<span class="option-desc">{opt.desc}</span>
-						</button>
-					{/each}
+				<h2>About you</h2>
+				<p class="step-desc">This helps your AI coach personalize programming for your age and body.</p>
+
+				<div class="field-group">
+					<label class="field-label" for="dob">Date of birth</label>
+					<input
+						type="date"
+						id="dob"
+						class="date-input"
+						bind:value={dateOfBirth}
+						max={new Date().toISOString().split('T')[0]}
+					/>
+				</div>
+
+				<div class="field-group">
+					<label class="field-label">Gender</label>
+					<div class="chip-grid compact">
+						{#each genderOptions as opt}
+							<button
+								type="button"
+								class="chip wide"
+								class:selected={gender === opt.value}
+								onclick={() => gender = opt.value}
+							>
+								{opt.label}
+							</button>
+						{/each}
+					</div>
 				</div>
 			{/if}
 
@@ -132,26 +176,78 @@
 				</div>
 			{/if}
 
-			<!-- Step 3: Equipment -->
+			<!-- Step 3: Goals -->
 			{#if step === 3}
-				<h2>Available equipment?</h2>
-				<p class="step-desc">Select everything you have access to.</p>
-				<div class="chip-grid">
-					{#each equipmentOptions as eq}
+				<h2>What's your primary goal?</h2>
+				<p class="step-desc">This shapes your training split, volume, and intensity.</p>
+				<div class="option-grid">
+					{#each goalOptions as opt}
 						<button
 							type="button"
-							class="chip"
-							class:selected={equipment.includes(eq)}
-							onclick={() => toggleEquipment(eq)}
+							class="option-card"
+							class:selected={goals === opt.value}
+							onclick={() => goals = opt.value}
 						>
-							{eq}
+							<span class="option-label">{opt.label}</span>
+							<span class="option-desc">{opt.desc}</span>
 						</button>
 					{/each}
 				</div>
 			{/if}
 
-			<!-- Step 4: Training Days + Duration -->
+			<!-- Step 4: Equipment -->
 			{#if step === 4}
+				<h2>Available equipment?</h2>
+				<div class="step-desc-row">
+					<p class="step-desc">Select everything you have access to.</p>
+					<button
+						type="button"
+						class="select-all-link"
+						onclick={() => allSelected ? deselectAllEquipment() : selectAllEquipment()}
+					>
+						{allSelected ? 'Deselect all' : 'Select all'}
+					</button>
+				</div>
+
+				<div class="equipment-section">
+					<span class="group-label">Free weights</span>
+					<div class="chip-grid">
+						{#each ['barbell', 'dumbbell', 'ez barbell', 'kettlebell'] as eq}
+							<button type="button" class="chip" class:selected={equipment.includes(eq)} onclick={() => toggleEquipment(eq)}>{eq}</button>
+						{/each}
+					</div>
+				</div>
+
+				<div class="equipment-section">
+					<span class="group-label">Machines & cables</span>
+					<div class="chip-grid">
+						{#each ['cable', 'machine', 'smith machine'] as eq}
+							<button type="button" class="chip" class:selected={equipment.includes(eq)} onclick={() => toggleEquipment(eq)}>{eq}</button>
+						{/each}
+					</div>
+				</div>
+
+				<div class="equipment-section">
+					<span class="group-label">Stations</span>
+					<div class="chip-grid">
+						{#each ['bench', 'squat rack', 'pull-up bar'] as eq}
+							<button type="button" class="chip" class:selected={equipment.includes(eq)} onclick={() => toggleEquipment(eq)}>{eq}</button>
+						{/each}
+					</div>
+				</div>
+
+				<div class="equipment-section">
+					<span class="group-label">Other</span>
+					<div class="chip-grid">
+						{#each ['resistance band'] as eq}
+							<button type="button" class="chip" class:selected={equipment.includes(eq)} onclick={() => toggleEquipment(eq)}>{eq}</button>
+						{/each}
+					</div>
+				</div>
+			{/if}
+
+			<!-- Step 5: Training Schedule -->
+			{#if step === 5}
 				<h2>Training schedule</h2>
 				<p class="step-desc">How many days per week and how long per session?</p>
 
@@ -188,40 +284,41 @@
 				</div>
 			{/if}
 
-			<!-- Step 5: Unit preference -->
-			{#if step === 5}
-				<h2>Weight unit preference</h2>
-				<p class="step-desc">Used for target weights in your plans.</p>
-				<div class="chip-grid compact">
-					<button
-						type="button"
-						class="chip wide"
-						class:selected={unitPref === 'lb'}
-						onclick={() => unitPref = 'lb'}
-					>
-						Pounds (lb)
-					</button>
-					<button
-						type="button"
-						class="chip wide"
-						class:selected={unitPref === 'kg'}
-						onclick={() => unitPref = 'kg'}
-					>
-						Kilograms (kg)
-					</button>
-				</div>
-			{/if}
-
-			<!-- Step 6: Injuries -->
+			<!-- Step 6: Injuries (Yes/No gate) -->
 			{#if step === 6}
 				<h2>Any current injuries?</h2>
-				<p class="step-desc">Optional. Comma-separated (e.g. "left shoulder, lower back"). Leave blank if none.</p>
-				<textarea
-					class="injury-input"
-					placeholder="e.g. left shoulder, lower back"
-					bind:value={injuries}
-					rows="3"
-				></textarea>
+				<p class="step-desc">Your AI coach will avoid exercises that stress injured areas.</p>
+
+				<div class="chip-grid compact injury-gate">
+					<button
+						type="button"
+						class="chip wide"
+						class:selected={hasInjuries === false}
+						onclick={() => { hasInjuries = false; injuries = ''; }}
+					>
+						No
+					</button>
+					<button
+						type="button"
+						class="chip wide"
+						class:selected={hasInjuries === true}
+						onclick={() => hasInjuries = true}
+					>
+						Yes
+					</button>
+				</div>
+
+				{#if hasInjuries}
+					<div class="injury-expand">
+						<label class="field-label">Describe your injuries</label>
+						<textarea
+							class="injury-input"
+							placeholder="e.g. left shoulder, lower back"
+							bind:value={injuries}
+							rows="3"
+						></textarea>
+					</div>
+				{/if}
 			{/if}
 		</div>
 
@@ -233,18 +330,18 @@
 				<div></div>
 			{/if}
 
-			{#if step < totalSteps}
-				<button type="button" class="btn btn-primary" disabled={!canAdvance} onclick={next}>
-					Continue
-				</button>
-			{:else}
-				<button type="submit" class="btn btn-primary" disabled={submitting}>
+			{#if showSubmit}
+				<button type="submit" class="btn btn-primary" disabled={!canAdvance || submitting}>
 					{#if submitting}
 						<span class="spinner"></span>
 						Saving...
 					{:else}
 						Generate My Plan
 					{/if}
+				</button>
+			{:else}
+				<button type="button" class="btn btn-primary" disabled={!canAdvance} onclick={next}>
+					Continue
 				</button>
 			{/if}
 		</div>
@@ -304,6 +401,10 @@
 		line-height: 1.5;
 	}
 
+	.field-group {
+		margin-bottom: 1.5rem;
+	}
+
 	.option-grid {
 		display: flex;
 		flex-direction: column;
@@ -343,6 +444,50 @@
 	.option-desc {
 		font-size: 0.8rem;
 		color: var(--color-text-muted);
+	}
+
+	.step-desc-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		gap: 1rem;
+		margin-bottom: 1.5rem;
+	}
+
+	.step-desc-row .step-desc {
+		margin-bottom: 0;
+	}
+
+	.select-all-link {
+		background: none;
+		border: none;
+		color: var(--color-accent);
+		font-family: var(--font-body);
+		font-size: 0.8rem;
+		font-weight: 500;
+		cursor: pointer;
+		padding: 0;
+		white-space: nowrap;
+		flex-shrink: 0;
+	}
+
+	.select-all-link:hover {
+		text-decoration: underline;
+	}
+
+	.equipment-section {
+		margin-bottom: 1.25rem;
+	}
+
+	.group-label {
+		display: block;
+		font-family: var(--font-display);
+		font-size: 0.7rem;
+		font-weight: 500;
+		color: var(--color-text-muted);
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		margin-bottom: 0.5rem;
 	}
 
 	.chip-grid {
@@ -394,6 +539,43 @@
 		font-weight: 500;
 		color: var(--color-text-muted);
 		margin-bottom: 0.75rem;
+	}
+
+	.date-input {
+		width: 100%;
+		padding: 0.875rem 1rem;
+		background: var(--color-surface);
+		border: 1.5px solid var(--color-border);
+		border-radius: var(--radius);
+		color: var(--color-text);
+		font-family: var(--font-body);
+		font-size: 0.9rem;
+		outline: none;
+		transition: border-color 0.15s ease;
+		color-scheme: dark;
+	}
+
+	.date-input:focus {
+		border-color: var(--color-accent);
+	}
+
+	.injury-gate {
+		margin-bottom: 1.5rem;
+	}
+
+	.injury-expand {
+		animation: slideDown 0.2s ease;
+	}
+
+	@keyframes slideDown {
+		from {
+			opacity: 0;
+			transform: translateY(-8px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
 	}
 
 	.injury-input {

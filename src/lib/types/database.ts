@@ -10,6 +10,8 @@
 export interface UserSettings {
 	id: string;
 	user_id: string;
+	date_of_birth: string | null;
+	gender: 'male' | 'female' | 'prefer_not_to_say' | null;
 	goals: string;
 	experience_level: string;
 	equipment: string[];
@@ -83,6 +85,8 @@ export interface CheckIn {
 
 export interface UserSettingsInsert {
 	user_id: string;
+	date_of_birth?: string | null;
+	gender?: 'male' | 'female' | 'prefer_not_to_say' | null;
 	goals?: string;
 	experience_level?: string;
 	equipment?: string[];
@@ -93,6 +97,8 @@ export interface UserSettingsInsert {
 }
 
 export interface UserSettingsUpdate {
+	date_of_birth?: string | null;
+	gender?: 'male' | 'female' | 'prefer_not_to_say' | null;
 	goals?: string;
 	experience_level?: string;
 	equipment?: string[];
