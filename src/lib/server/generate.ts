@@ -137,9 +137,27 @@ function buildSystemPrompt(): string {
 11. Use the athlete's unit preference (lb or kg) for all target weights.
 12. Exercise variety is critical. Do NOT repeat the same exercise across multiple training days in the same week. Each training day should have a distinct set of exercises. Exercises may recur across weeks but not within the same week.
 13. Select a diverse mix of exercises from the catalog — vary movement patterns (push, pull, hinge, squat, carry, isolation) and target different muscle groups across the week.
+14. Demographic-aware programming:
+    - Athletes aged 60+: cap working intensity at RPE 7-8, emphasize functional movements (squats to chair, farmer carries, step-ups), include balance work, avoid heavy axial loading.
+    - Athletes under 18: prioritize bodyweight and machine exercises, limit heavy compound barbell lifts (no 1-3RM), focus on movement quality and moderate rep ranges (8-15).
+    - Use gender to inform volume distribution where applicable (e.g., upper/lower volume split), but do not make assumptions about strength levels — rely on logged performance data.
+    - If age or gender is not provided, program as a general adult.
 
 ## Output
 Call the generate_weekly_plan tool exactly once with the complete plan.`;
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function calculateAge(dob: string): number {
+	const birth = new Date(dob);
+	const today = new Date();
+	let age = today.getFullYear() - birth.getFullYear();
+	const m = today.getMonth() - birth.getMonth();
+	if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+	return age;
 }
 
 // ============================================================================
@@ -152,7 +170,12 @@ function buildUserMessage(
 ): string {
 	const { user_settings, check_in_history, previous_plans, historical_set_logs, next_week_number } = context;
 
+	const age = user_settings.date_of_birth ? calculateAge(user_settings.date_of_birth) : null;
+
 	let msg = `## Athlete Profile
+- Date of birth: ${user_settings.date_of_birth ?? 'Not provided'}
+- Gender: ${user_settings.gender ?? 'Not provided'}
+- Age: ${age !== null ? age : 'Unknown'}
 - Goal: ${user_settings.goals}
 - Experience: ${user_settings.experience_level}
 - Equipment: ${user_settings.equipment.join(', ')}

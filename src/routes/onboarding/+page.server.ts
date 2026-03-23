@@ -27,9 +27,16 @@ export const actions: Actions = {
 
 		const formData = await request.formData();
 
+		const date_of_birth = formData.get('date_of_birth') as string;
+		const gender = formData.get('gender') as string;
 		const goals = formData.get('goals') as string;
 		const experience_level = formData.get('experience_level') as string;
 		const equipment = formData.getAll('equipment') as string[];
+		// Always include bodyweight — it's not "equipment", everyone has a body
+		// ExerciseDB uses "body weight" (with space) as the equipment key
+		if (!equipment.includes('body weight')) {
+			equipment.push('body weight');
+		}
 		const training_days_per_week = parseInt(formData.get('training_days_per_week') as string, 10);
 		const session_duration_minutes = parseInt(formData.get('session_duration_minutes') as string, 10);
 		const injuries = (formData.get('injuries') as string)
@@ -39,11 +46,18 @@ export const actions: Actions = {
 		const unit_pref = (formData.get('unit_pref') as 'lb' | 'kg') || 'lb';
 
 		// Validate required fields
-		if (!goals || !experience_level || equipment.length === 0 || !training_days_per_week || !session_duration_minutes) {
+		if (!date_of_birth || !gender || !goals || !experience_level || equipment.length === 0 || !training_days_per_week || !session_duration_minutes) {
 			return fail(400, { message: 'Please complete all required fields.' });
 		}
 
+		// Validate gender value
+		if (!['male', 'female', 'prefer_not_to_say'].includes(gender)) {
+			return fail(400, { message: 'Invalid gender value.' });
+		}
+
 		const result = await updateUserSettings(supabase, user.id, {
+			date_of_birth,
+			gender: gender as 'male' | 'female' | 'prefer_not_to_say',
 			goals,
 			experience_level,
 			equipment,
