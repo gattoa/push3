@@ -1,0 +1,174 @@
+/* ============================================================
+   Push Design System — Tokens
+   Vibrant Momentum · Context-Driven Color System
+   ============================================================ */
+
+:root {
+	/* ═══ Color Channels ═══ */
+
+	/* Activity (Mint) — workouts, progress, active states */
+	--color-activity: #2dd4a8;
+	--color-activity-hover: #1ab892;
+	--color-activity-strong: #5eead4;
+	--color-activity-muted: rgba(45, 212, 168, 0.12);
+	--color-activity-subtle: rgba(45, 212, 168, 0.05);
+
+	/* Rest (Slate Blue) — rest timers, rest days, deload, recovery */
+	--color-rest: #64a1f4;
+	--color-rest-hover: #4b8fe8;
+	--color-rest-strong: #93bef8;
+	--color-rest-muted: rgba(100, 161, 244, 0.12);
+	--color-rest-subtle: rgba(100, 161, 244, 0.05);
+
+	/* Celebrate (Gold) — PRs, milestones, streaks, workout complete */
+	--color-celebrate: #e8b931;
+	--color-celebrate-hover: #d4a520;
+	--color-celebrate-strong: #f5d76e;
+	--color-celebrate-muted: rgba(232, 185, 49, 0.12);
+	--color-celebrate-subtle: rgba(232, 185, 49, 0.05);
+
+	/* Reflect (Lavender) — check-ins, journaling, weekly reflection */
+	--color-reflect: #a78bfa;
+	--color-reflect-hover: #9577f0;
+	--color-reflect-strong: #c4b5fd;
+	--color-reflect-muted: rgba(167, 139, 250, 0.12);
+	--color-reflect-subtle: rgba(167, 139, 250, 0.05);
+
+	/* Danger (Rose) — skip, delete, errors */
+	--color-danger: #f27a7a;
+	--color-danger-hover: #e45e5e;
+	--color-danger-strong: #fca5a5;
+	--color-danger-muted: rgba(242, 122, 122, 0.12);
+	--color-danger-subtle: rgba(242, 122, 122, 0.05);
+
+	/* Brand Gradient */
+	--gradient-brand: linear-gradient(135deg, #2dd4a8, #e8b931, #a78bfa);
+	--gradient-brand-muted: linear-gradient(
+		135deg,
+		rgba(45, 212, 168, 0.25),
+		rgba(232, 185, 49, 0.25),
+		rgba(167, 139, 250, 0.25)
+	);
+
+	/* ═══ Surfaces (warm-tinted) ═══ */
+	--color-bg: #0b0a09;
+	--color-bg-raised: #12110f;
+	--color-surface: #17150f;
+	--color-surface-hover: #1d1b16;
+	--color-surface-active: #23211b;
+
+	/* ═══ Borders (warm-tinted) ═══ */
+	--color-border: #28251e;
+	--color-border-subtle: #1f1d17;
+	--color-border-strong: #34312a;
+
+	/* ═══ Text ═══ */
+	--color-text: #f7f5f0;
+	--color-text-secondary: #a8a49b;
+	--color-text-tertiary: #736f66;
+	--color-text-inverse: #0b0a09;
+
+	/* ═══ Typography ═══ */
+	--font-display: 'Manrope', sans-serif;
+	--font-body: 'Manrope', sans-serif;
+	--font-mono: 'JetBrains Mono', monospace;
+
+	/* Type Scale (minor third 1.2) */
+	--text-2xs: 0.625rem;
+	--text-xs: 0.75rem;
+	--text-sm: 0.875rem;
+	--text-base: 1rem;
+	--text-lg: 1.125rem;
+	--text-xl: 1.25rem;
+	--text-2xl: 1.5rem;
+	--text-3xl: 2rem;
+	--text-4xl: 3rem;
+
+	/* Weights */
+	--weight-regular: 400;
+	--weight-medium: 500;
+	--weight-semibold: 600;
+	--weight-bold: 700;
+	--weight-extrabold: 800;
+
+	/* Line Heights */
+	--leading-tight: 1.2;
+	--leading-snug: 1.35;
+	--leading-normal: 1.5;
+	--leading-relaxed: 1.65;
+
+	/* Letter Spacing */
+	--tracking-tight: -0.01em;
+	--tracking-normal: 0;
+	--tracking-wide: 0.05em;
+	--tracking-wider: 0.08em;
+
+	/* ═══ Spacing ═══ */
+	--space-0: 0;
+	--space-0-5: 0.125rem;
+	--space-1: 0.25rem;
+	--space-1-5: 0.375rem;
+	--space-2: 0.5rem;
+	--space-3: 0.75rem;
+	--space-4: 1rem;
+	--space-5: 1.25rem;
+	--space-6: 1.5rem;
+	--space-8: 2rem;
+	--space-10: 2.5rem;
+	--space-12: 3rem;
+	--space-16: 4rem;
+
+	/* Page Layout */
+	--page-gutter: 1rem;
+	--page-max-width: 480px;
+
+	/* ═══ Border Radius ═══ */
+	--radius-xs: 4px;
+	--radius-sm: 6px;
+	--radius-md: 8px;
+	--radius: 12px;
+	--radius-lg: 16px;
+	--radius-xl: 20px;
+	--radius-full: 9999px;
+
+	/* ═══ Shadows ═══ */
+	--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+	--shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+	--shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+	--shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.6);
+	--shadow-glow: 0 0 20px rgba(45, 212, 168, 0.15);
+
+	/* ═══ Transitions / Animation ═══ */
+	--ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+	--ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+	--ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+	--duration-fast: 100ms;
+	--duration-normal: 150ms;
+	--duration-slow: 300ms;
+	--duration-slower: 500ms;
+
+	/* ═══ Opacity ═══ */
+	--opacity-disabled: 0.4;
+	--opacity-muted: 0.6;
+	--opacity-hover: 0.8;
+	--opacity-subtle: 0.15;
+	--opacity-ghost: 0.05;
+
+	/* ═══ Z-Index ═══ */
+	--z-base: 0;
+	--z-raised: 10;
+	--z-dropdown: 100;
+	--z-sticky: 200;
+	--z-overlay: 300;
+	--z-modal: 400;
+	--z-toast: 500;
+
+	/* ═══ Safe Areas (PWA) ═══ */
+	--safe-top: env(safe-area-inset-top, 0px);
+	--safe-bottom: env(safe-area-inset-bottom, 0px);
+	--safe-left: env(safe-area-inset-left, 0px);
+	--safe-right: env(safe-area-inset-right, 0px);
+	--page-pad-top: calc(var(--safe-top) + 1rem);
+	--page-pad-bottom: calc(var(--safe-bottom) + 2rem);
+}
