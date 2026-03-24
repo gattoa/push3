@@ -7,7 +7,7 @@ declare global {
 			safeGetSession: () => Promise<{ session: Session | null; user: User | null }>;
 		}
 		interface PageData {
-			supabase: SupabaseClient;
+			supabase?: SupabaseClient;
 			session: Session | null;
 			user: User | null;
 			cookies?: { name: string; value: string }[];

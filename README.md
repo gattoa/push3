@@ -88,16 +88,34 @@ src/
 
 ## Design System
 
-| Token                | Value       | Usage              |
-|----------------------|-------------|--------------------|
-| `--color-bg`         | `#0a0a0a`   | Page background    |
-| `--color-surface`    | `#141414`   | Cards, panels      |
-| `--color-border`     | `#262626`   | Borders, dividers  |
-| `--color-text`       | `#fafafa`   | Primary text       |
-| `--color-text-muted` | `#a1a1aa`   | Secondary text     |
-| `--color-accent`     | `#22c55e`   | CTAs, highlights   |
-| Font (display)       | JetBrains Mono | Headings, brand |
-| Font (body)          | Inter          | Body text        |
+### Surfaces & Text
+
+| Token                       | Value       | Usage              |
+|-----------------------------|-------------|--------------------|
+| `--color-bg`                | `#0a0a0a`   | Page background    |
+| `--color-bg-raised`         | `#141414`   | Cards, panels      |
+| `--color-border`            | `#262626`   | Borders, dividers  |
+| `--color-text`              | `#fafafa`   | Primary text       |
+| `--color-text-secondary`    | `#a1a1aa`   | Secondary text     |
+| `--color-text-tertiary`     | `#71717a`   | Tertiary text      |
+
+### Semantic Colors
+
+| Role        | Token                  | Value       | Meaning                        |
+|-------------|------------------------|-------------|--------------------------------|
+| **Activity** (mint)   | `--color-activity`     | `#2dd4a8`   | Doing / on track — CTAs, active state, completed sets |
+| **Celebrate** (gold)  | `--color-celebrate`    | `#e8b931`   | Achievement — PRs, workout complete |
+| **Danger** (rose)     | `--color-danger`       | `#f27a7a`   | Skipped / destructive actions  |
+| **Reflect** (lavender)| `--color-reflect`      | `#a78bfa`   | Check-in, introspection        |
+| **Rest** (slate blue) | `--color-rest`         | `#64a1f4`   | Rest days, recovery            |
+
+### Typography
+
+| Role    | Font           | Usage                    |
+|---------|----------------|--------------------------|
+| Display | Manrope        | Headings, brand identity |
+| Body    | Inter          | Body text, UI            |
+| Mono    | JetBrains Mono | Numbers, data, inputs    |
 
 ## License
 

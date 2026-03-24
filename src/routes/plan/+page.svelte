@@ -2,8 +2,8 @@
 	import type { FullPlan, FullPlanDay } from '$lib/types/database';
 
 	let { data } = $props();
-	const plan: FullPlan = data.fullPlan;
-	const todayIndex: number = data.todayIndex;
+	const plan = $derived(data.fullPlan as FullPlan);
+	const todayIndex = $derived(data.todayIndex as number);
 
 	const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 

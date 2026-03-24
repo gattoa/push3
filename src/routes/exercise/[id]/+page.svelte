@@ -2,7 +2,7 @@
 	import type { Exercise } from '$lib/types/exercise';
 
 	let { data } = $props();
-	const exercise: Exercise = data.exercise;
+	const exercise = $derived(data.exercise as Exercise);
 </script>
 
 <svelte:head>
