@@ -169,12 +169,10 @@
 		font-family: var(--font-display);
 		font-size: clamp(4.5rem, 15vw, 8rem);
 		font-weight: 800;
-		letter-spacing: 0.15em;
+		letter-spacing: -0.06em;
 		line-height: 1;
 		margin-bottom: 1rem;
 		color: var(--color-text);
-		display: flex;
-		gap: 0.02em;
 	}
 
 	.title-letter {

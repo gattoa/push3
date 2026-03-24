@@ -219,3 +219,17 @@ export interface HistoricalSetLog {
 	status: string;
 	logged_at: string | null;
 }
+
+// ============================================================================
+// Exercise history (per-exercise context for workout UI)
+// ============================================================================
+
+/** Per-exercise historical context returned by get_exercise_history RPC */
+export interface ExerciseHistory {
+	last_weight: number | null;
+	last_reps: number | null;
+	best_e1rm: number | null;
+}
+
+/** Map of exercise_id → ExerciseHistory */
+export type ExerciseHistoryMap = Record<string, ExerciseHistory>;

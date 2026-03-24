@@ -3,7 +3,7 @@ import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/publi
 import { redirect, type Handle } from '@sveltejs/kit';
 
 /** Routes that don't require authentication */
-const PUBLIC_ROUTES = ['/', '/auth/callback', '/auth/error', '/design-system'];
+const PUBLIC_ROUTES = ['/', '/auth/callback', '/auth/error', '/design-system', '/preview-workout'];
 
 /** Routes that should skip the onboarding check */
 const SKIP_ONBOARDING_CHECK = ['/onboarding', '/api/'];

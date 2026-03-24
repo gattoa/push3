@@ -1,37 +1,62 @@
 <script lang="ts">
 	import {
 		Check, X, Menu, Trophy, ClipboardCheck,
-		ChevronRight, ChevronDown, TrendingUp, Flame, Dumbbell, Eye
+		ChevronRight, ChevronDown, TrendingUp, Flame, Dumbbell, Eye, CircleUser
 	} from 'lucide-svelte';
-	import type { FullPlanDay, FullPlanExercise, FullPlanSet } from '$lib/types/database';
-	import { page } from '$app/state';
-	import { goto } from '$app/navigation';
 
-	let { data } = $props();
-	const day: FullPlanDay = data.day;
-	const dayIndex: number = data.dayIndex;
-	const unitPref: string = data.unitPref;
-	const exerciseHistory: Record<string, { lastWeight: number; lastReps: number; bestE1RM: number }> = data.exerciseHistory;
-	const initialBanner: 'check-in' | 'plan-review' | null = data.banner;
-
-	// Avatar menu
-	let showMenu = $state(false);
-	const user = $derived(page.data.user);
-	const initials = $derived(
-		user?.user_metadata?.full_name
-			? user.user_metadata.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
-			: user?.email?.[0]?.toUpperCase() ?? '?'
-	);
-	const avatarUrl = $derived(user?.user_metadata?.avatar_url ?? null);
-
-	async function signOut() {
-		showMenu = false;
-		await page.data.supabase.auth.signOut();
-		goto('/');
-	}
-
+	// ── Mock Data (replaces server props) ─────────────────────
+	const dayIndex = 0;
 	const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 	const todayDate = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+	const unitPref = 'lb';
+
+	const exerciseHistory: Record<string, { lastWeight: number; lastReps: number; bestE1RM: number }> = {
+		'0001': { lastWeight: 135, lastReps: 8, bestE1RM: 171 },
+		'0002': { lastWeight: 50, lastReps: 10, bestE1RM: 66.7 }
+	};
+
+	const initialBanner: 'check-in' | 'plan-review' | null = 'check-in';
+
+	// Mock day structure matching FullPlanDay
+	const day = {
+		id: 'd1',
+		day_index: 0,
+		split_label: 'Push',
+		exercises: [
+			{
+				id: 'ex1', exercise_id: '0001', exercise_name: 'barbell bench press',
+				order_index: 0, notes: null,
+				sets: [
+					{ id: 's1', set_number: 1, target_reps: 10, target_weight: 140, log: { id: 'l1', actual_weight: 145, actual_reps: 10, status: 'completed', logged_at: '2026-03-24T10:00:00Z' } },
+					{ id: 's2', set_number: 2, target_reps: 10, target_weight: 140, log: { id: 'l2', actual_weight: 140, actual_reps: 9, status: 'completed', logged_at: '2026-03-24T10:05:00Z' } },
+					{ id: 's3', set_number: 3, target_reps: 10, target_weight: 140, log: { id: 'l3', actual_weight: 140, actual_reps: 10, status: 'completed', logged_at: '2026-03-24T10:10:00Z' } }
+				]
+			},
+			{
+				id: 'ex2', exercise_id: '0002', exercise_name: 'incline dumbbell press',
+				order_index: 1, notes: 'Slow eccentric, 3 sec down',
+				sets: [
+					{ id: 's4', set_number: 1, target_reps: 12, target_weight: 50, log: { id: 'l4', actual_weight: 50, actual_reps: 12, status: 'completed', logged_at: '2026-03-24T10:15:00Z' } },
+					{ id: 's5', set_number: 2, target_reps: 12, target_weight: 50, log: { id: 'l5', actual_weight: 50, actual_reps: 10, status: 'completed', logged_at: '2026-03-24T10:20:00Z' } },
+					{ id: 's6', set_number: 3, target_reps: 12, target_weight: 50, log: null }
+				]
+			},
+			{
+				id: 'ex3', exercise_id: '0003', exercise_name: 'cable fly',
+				order_index: 2, notes: null,
+				sets: [
+					{ id: 's7', set_number: 1, target_reps: 15, target_weight: null, log: null },
+					{ id: 's8', set_number: 2, target_reps: 15, target_weight: null, log: null },
+					{ id: 's9', set_number: 3, target_reps: 15, target_weight: null, log: { id: 'l6', actual_weight: null, actual_reps: null, status: 'skipped', logged_at: '2026-03-24T10:30:00Z' } }
+				]
+			}
+		]
+	};
+
+	// Mock user (no auth)
+	let showMenu = $state(false);
+	const avatarUrl: string | null = null;
+	const initials = 'AG';
 
 	// ── Set State ──────────────────────────────────────────────
 	let setStates = $state<Record<string, {
@@ -60,11 +85,11 @@
 	});
 
 	// ── Derived Stats ──────────────────────────────────────────
-	let totalSets = $derived(day.exercises.reduce((sum, ex) => sum + ex.sets.length, 0));
+	let totalSets = $derived(day.exercises.reduce((sum: number, ex: any) => sum + ex.sets.length, 0));
 	let completedSets = $derived(Object.values(setStates).filter((s) => s.status === 'completed').length);
 	let skippedSets = $derived(Object.values(setStates).filter((s) => s.status === 'skipped').length);
 	let totalVolume = $derived(
-		Object.values(setStates).reduce((sum, s) => {
+		Object.values(setStates).reduce((sum: number, s) => {
 			if (s.status === 'completed' && s.weight && s.reps) {
 				return sum + parseFloat(s.weight) * parseInt(s.reps, 10);
 			}
@@ -74,7 +99,6 @@
 	let allDone = $derived(completedSets + skippedSets === totalSets && totalSets > 0);
 
 	// ── PR Detection ──────────────────────────────────────────
-	// Epley formula: E1RM = weight × (1 + reps / 30)
 	function computeE1RM(weight: number, reps: number): number {
 		return weight * (1 + reps / 30);
 	}
@@ -86,20 +110,20 @@
 		const r = parseInt(s.reps, 10);
 		if (w <= 0 || r <= 0) return false;
 		const hist = exerciseHistory[exerciseId];
-		if (!hist) return false; // No baseline — can't determine PR
+		if (!hist) return false;
 		return computeE1RM(w, r) > hist.bestE1RM;
 	}
 
 	let prCount = $derived(
-		day.exercises.reduce((sum, ex) =>
-			sum + ex.sets.filter((set) => isPR(ex.exercise_id, set.id)).length, 0)
+		day.exercises.reduce((sum: number, ex: any) =>
+			sum + ex.sets.filter((set: any) => isPR(ex.exercise_id, set.id)).length, 0)
 	);
 
 	// ── Per-Exercise Progress ─────────────────────────────────
 	const EX_ARC_R = 22;
 	const EX_ARC_C = Math.PI * EX_ARC_R;
 
-	function exerciseProgress(exercise: FullPlanExercise) {
+	function exerciseProgress(exercise: any) {
 		const total = exercise.sets.length;
 		let prSets = 0, actSets = 0, skipSets = 0;
 		for (const set of exercise.sets) {
@@ -121,12 +145,12 @@
 	}
 
 	type ExerciseState = 'completed' | 'active' | 'upcoming';
-	function getExerciseState(exercise: FullPlanExercise, index: number): ExerciseState {
+	function getExerciseState(exercise: any, index: number): ExerciseState {
 		const prog = exerciseProgress(exercise);
 		if (prog.done === prog.total) return 'completed';
-		const sorted = day.exercises.slice().sort((a, b) => a.order_index - b.order_index);
+		const sorted = day.exercises.slice().sort((a: any, b: any) => a.order_index - b.order_index);
 		for (let i = 0; i < sorted.length; i++) {
-			if (sorted[i].sets.some((set) => setStates[set.id]?.status === 'pending')) {
+			if (sorted[i].sets.some((set: any) => setStates[set.id]?.status === 'pending')) {
 				return sorted[i].id === exercise.id ? 'active' : 'upcoming';
 			}
 		}
@@ -138,12 +162,12 @@
 	let segments = $derived<Segment[]>(
 		day.exercises
 			.slice()
-			.sort((a, b) => a.order_index - b.order_index)
-			.flatMap((ex) =>
+			.sort((a: any, b: any) => a.order_index - b.order_index)
+			.flatMap((ex: any) =>
 				ex.sets
 					.slice()
-					.sort((a, b) => a.set_number - b.set_number)
-					.map((set) => {
+					.sort((a: any, b: any) => a.set_number - b.set_number)
+					.map((set: any) => {
 						const s = setStates[set.id];
 						if (!s) return { color: 'pending' as const };
 						if (s.status === 'completed' && isPR(ex.exercise_id, set.id)) return { color: 'celebrate' as const };
@@ -156,11 +180,10 @@
 
 	// ── Accordion ─────────────────────────────────────────────
 	function getInitialExpanded(): string | null {
-		const sorted = day.exercises.slice().sort((a, b) => a.order_index - b.order_index);
+		const sorted = day.exercises.slice().sort((a: any, b: any) => a.order_index - b.order_index);
 		for (const ex of sorted) {
-			if (ex.sets.some((set) => set.log?.status !== 'completed' && set.log?.status !== 'skipped')) return ex.id;
+			if (ex.sets.some((set: any) => set.log?.status !== 'completed' && set.log?.status !== 'skipped')) return ex.id;
 		}
-		// All completed or no logs — expand the first exercise
 		return sorted[0]?.id ?? null;
 	}
 	let expandedExercise = $state<string | null>(getInitialExpanded());
@@ -168,59 +191,33 @@
 	// ── Banner ────────────────────────────────────────────────
 	let bannerDismissed = $state(false);
 
-	// ── API Calls ─────────────────────────────────────────────
-	async function saveSet(setId: string, status: 'completed' | 'skipped' | 'pending') {
-		const s = setStates[setId];
-		if (!s || s.saving) return;
-
-		setStates[setId] = { ...s, saving: true, status };
-
-		try {
-			const res = await fetch('/api/log-set', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					planned_set_id: setId,
-					actual_weight: s.weight ? parseFloat(s.weight) : null,
-					actual_reps: s.reps ? parseInt(s.reps, 10) : null,
-					status
-				})
-			});
-
-			const result = await res.json();
-			if (res.ok) {
-				setStates[setId] = { ...setStates[setId], saving: false, logId: result.id };
-			} else {
-				console.error('Failed to save set:', result.error);
-				setStates[setId] = { ...setStates[setId], saving: false, status: s.status };
-			}
-		} catch (e) {
-			console.error('Network error saving set:', e);
-			setStates[setId] = { ...setStates[setId], saving: false, status: s.status };
-		}
-	}
-
+	// ── Mock API (local state toggle, no fetch) ───────────────
 	function handleComplete(setId: string) {
 		const s = setStates[setId];
 		if (!s) return;
-		saveSet(setId, s.status === 'completed' ? 'pending' : 'completed');
+		const newStatus = s.status === 'completed' ? 'pending' : 'completed';
+		// Auto-fill with target values if no weight/reps entered
+		const exercise = day.exercises.find((ex: any) => ex.sets.some((set: any) => set.id === setId));
+		const set = exercise?.sets.find((set: any) => set.id === setId);
+		const weight = s.weight || (set?.target_weight != null ? String(set.target_weight) : '');
+		const reps = s.reps || (set?.target_reps != null ? String(set.target_reps) : '');
+		setStates[setId] = { ...s, status: newStatus, weight, reps };
 	}
 
 	function handleSkip(setId: string) {
 		const s = setStates[setId];
 		if (!s) return;
-		saveSet(setId, s.status === 'skipped' ? 'pending' : 'skipped');
+		setStates[setId] = { ...s, status: s.status === 'skipped' ? 'pending' : 'skipped' };
 	}
 </script>
-
 <svelte:head>
-	<title>Push — {DAY_NAMES[dayIndex]} Workout</title>
+	<title>Push — Workout Preview</title>
 </svelte:head>
 
 <div class="page">
 	<!-- ═══ Header ═══ -->
 	<header class="header push-up" style="--d:0">
-		<a href="/plan" class="header-icon" title="Weekly agenda">
+		<a href="#" class="header-icon" title="Weekly agenda">
 			<Menu size={20} strokeWidth={2} />
 		</a>
 		<div class="header-center">
@@ -248,13 +245,13 @@
 	{#if initialBanner && !bannerDismissed}
 		<div class="banner slide-in">
 			{#if initialBanner === 'check-in'}
-				<a href="/check-in" class="banner-link">
+				<a href="#" class="banner-link">
 					<ClipboardCheck size={14} strokeWidth={2} />
 					<span class="banner-text">Time for your weekly check-in</span>
 					<ChevronRight size={13} strokeWidth={2} />
 				</a>
 			{:else}
-				<a href="/plan" class="banner-link banner-link-plan">
+				<a href="#" class="banner-link banner-link-plan">
 					<Eye size={14} strokeWidth={2} />
 					<span class="banner-text">Review your new training plan</span>
 					<ChevronRight size={13} strokeWidth={2} />
@@ -273,7 +270,7 @@
 	{#if day.exercises.length === 0}
 		<div class="rest-state push-up" style="--d:1">
 			<p>Rest day. Recover and prepare for your next session.</p>
-			<a href="/plan" class="btn btn-secondary">View Weekly Plan</a>
+			<a href="#" class="btn btn-secondary">View Weekly Plan</a>
 		</div>
 	{:else}
 		<!-- ═══ Progress Bar (segmented) ═══ -->
@@ -515,7 +512,7 @@
 						</div>
 					{/if}
 				</div>
-				<a href="/plan" class="btn btn-secondary summary-cta">View Weekly Plan</a>
+				<a href="#" class="btn btn-secondary summary-cta">View Weekly Plan</a>
 			</div>
 		{/if}
 	{/if}
