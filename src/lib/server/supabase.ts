@@ -7,6 +7,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
 	FullPlan,
 	GenerationContext,
+	ExerciseHistoryMap,
 	UserSettings,
 	UserSettingsUpdate,
 	WeeklyPlanInsert,
@@ -92,6 +93,29 @@ export async function getGenerationContext(
 		return null;
 	}
 	return data;
+}
+
+// ============================================================================
+// Exercise History (per-exercise context for workout UI)
+// ============================================================================
+
+export async function getExerciseHistory(
+	supabase: SupabaseClient,
+	userId: string,
+	exerciseIds: string[]
+): Promise<ExerciseHistoryMap> {
+	if (exerciseIds.length === 0) return {};
+
+	const { data, error } = await supabase.rpc('get_exercise_history', {
+		p_user_id: userId,
+		p_exercise_ids: exerciseIds
+	});
+
+	if (error) {
+		console.error('Failed to fetch exercise history:', error.message);
+		return {};
+	}
+	return (data as ExerciseHistoryMap) ?? {};
 }
 
 // ============================================================================

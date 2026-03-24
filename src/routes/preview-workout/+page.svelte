@@ -1,134 +1,215 @@
 <script lang="ts">
 	import {
-		Check, X, Menu, CircleUser, Trophy, ClipboardCheck,
-		ChevronRight, ChevronDown, TrendingUp, Flame, Dumbbell
+		Check, X, Menu, Trophy, ClipboardCheck,
+		ChevronRight, ChevronDown, TrendingUp, Flame, Dumbbell, Eye, CircleUser
 	} from 'lucide-svelte';
 
-	// ── Mock Data ──────────────────────────────────────────────
+	// ── Mock Data (replaces server props) ─────────────────────
 	const dayIndex = 0;
 	const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-	const todayDate = 'Mar 24';
-	const splitLabel = 'Push';
+	const todayDate = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 	const unitPref = 'lb';
 
-	const exercises = [
-		{
-			id: 'ex1',
-			exercise_id: '0001',
-			exercise_name: 'barbell bench press',
-			order_index: 0,
-			notes: null,
-			lastWeight: 135,
-			lastReps: 8,
-			bestE1RM: 171,
-			sets: [
-				{ id: 's1', set_number: 1, target_reps: 10, target_weight: 140, status: 'completed' as const, actualWeight: 145, actualReps: 10, isPR: true },
-				{ id: 's2', set_number: 2, target_reps: 10, target_weight: 140, status: 'completed' as const, actualWeight: 140, actualReps: 9, isPR: false },
-				{ id: 's3', set_number: 3, target_reps: 10, target_weight: 140, status: 'completed' as const, actualWeight: 140, actualReps: 10, isPR: false }
-			]
-		},
-		{
-			id: 'ex2',
-			exercise_id: '0002',
-			exercise_name: 'incline dumbbell press',
-			order_index: 1,
-			notes: 'Slow eccentric, 3 sec down',
-			lastWeight: 50,
-			lastReps: 10,
-			bestE1RM: 66.7,
-			sets: [
-				{ id: 's4', set_number: 1, target_reps: 12, target_weight: 50, status: 'completed' as const, actualWeight: 50, actualReps: 12, isPR: false },
-				{ id: 's5', set_number: 2, target_reps: 12, target_weight: 50, status: 'completed' as const, actualWeight: 50, actualReps: 10, isPR: false },
-				{ id: 's6', set_number: 3, target_reps: 12, target_weight: 50, status: 'pending' as const, actualWeight: null, actualReps: null, isPR: false }
-			]
-		},
-		{
-			id: 'ex3',
-			exercise_id: '0003',
-			exercise_name: 'cable fly',
-			order_index: 2,
-			notes: null,
-			lastWeight: null,
-			lastReps: null,
-			bestE1RM: null,
-			sets: [
-				{ id: 's7', set_number: 1, target_reps: 15, target_weight: null, status: 'pending' as const, actualWeight: null, actualReps: null, isPR: false },
-				{ id: 's8', set_number: 2, target_reps: 15, target_weight: null, status: 'pending' as const, actualWeight: null, actualReps: null, isPR: false },
-				{ id: 's9', set_number: 3, target_reps: 15, target_weight: null, status: 'skipped' as const, actualWeight: null, actualReps: null, isPR: false }
-			]
+	const exerciseHistory: Record<string, { lastWeight: number; lastReps: number; bestE1RM: number }> = {
+		'0001': { lastWeight: 135, lastReps: 8, bestE1RM: 171 },
+		'0002': { lastWeight: 50, lastReps: 10, bestE1RM: 66.7 }
+	};
+
+	const initialBanner: 'check-in' | 'plan-review' | null = 'check-in';
+
+	// Mock day structure matching FullPlanDay
+	const day = {
+		id: 'd1',
+		day_index: 0,
+		split_label: 'Push',
+		exercises: [
+			{
+				id: 'ex1', exercise_id: '0001', exercise_name: 'barbell bench press',
+				order_index: 0, notes: null,
+				sets: [
+					{ id: 's1', set_number: 1, target_reps: 10, target_weight: 140, log: { id: 'l1', actual_weight: 145, actual_reps: 10, status: 'completed', logged_at: '2026-03-24T10:00:00Z' } },
+					{ id: 's2', set_number: 2, target_reps: 10, target_weight: 140, log: { id: 'l2', actual_weight: 140, actual_reps: 9, status: 'completed', logged_at: '2026-03-24T10:05:00Z' } },
+					{ id: 's3', set_number: 3, target_reps: 10, target_weight: 140, log: { id: 'l3', actual_weight: 140, actual_reps: 10, status: 'completed', logged_at: '2026-03-24T10:10:00Z' } }
+				]
+			},
+			{
+				id: 'ex2', exercise_id: '0002', exercise_name: 'incline dumbbell press',
+				order_index: 1, notes: 'Slow eccentric, 3 sec down',
+				sets: [
+					{ id: 's4', set_number: 1, target_reps: 12, target_weight: 50, log: { id: 'l4', actual_weight: 50, actual_reps: 12, status: 'completed', logged_at: '2026-03-24T10:15:00Z' } },
+					{ id: 's5', set_number: 2, target_reps: 12, target_weight: 50, log: { id: 'l5', actual_weight: 50, actual_reps: 10, status: 'completed', logged_at: '2026-03-24T10:20:00Z' } },
+					{ id: 's6', set_number: 3, target_reps: 12, target_weight: 50, log: null }
+				]
+			},
+			{
+				id: 'ex3', exercise_id: '0003', exercise_name: 'cable fly',
+				order_index: 2, notes: null,
+				sets: [
+					{ id: 's7', set_number: 1, target_reps: 15, target_weight: null, log: null },
+					{ id: 's8', set_number: 2, target_reps: 15, target_weight: null, log: null },
+					{ id: 's9', set_number: 3, target_reps: 15, target_weight: null, log: { id: 'l6', actual_weight: null, actual_reps: null, status: 'skipped', logged_at: '2026-03-24T10:30:00Z' } }
+				]
+			}
+		]
+	};
+
+	// Mock user (no auth)
+	let showMenu = $state(false);
+	const avatarUrl: string | null = null;
+	const initials = 'AG';
+
+	// ── Set State ──────────────────────────────────────────────
+	let setStates = $state<Record<string, {
+		weight: string;
+		reps: string;
+		status: 'pending' | 'completed' | 'skipped';
+		saving: boolean;
+		logId: string | null;
+	}>>({});
+
+	$effect(() => {
+		const initial: typeof setStates = {};
+		for (const exercise of day.exercises) {
+			for (const set of exercise.sets) {
+				const log = set.log;
+				initial[set.id] = {
+					weight: log?.actual_weight?.toString() ?? '',
+					reps: log?.actual_reps?.toString() ?? '',
+					status: (log?.status as 'pending' | 'completed' | 'skipped') ?? 'pending',
+					saving: false,
+					logId: log?.id ?? null
+				};
+			}
 		}
-	];
+		setStates = initial;
+	});
 
 	// ── Derived Stats ──────────────────────────────────────────
-	const totalSets = exercises.reduce((sum, ex) => sum + ex.sets.length, 0);
-	const completedSets = exercises.reduce((sum, ex) => sum + ex.sets.filter(s => s.status === 'completed').length, 0);
-	const skippedSets = exercises.reduce((sum, ex) => sum + ex.sets.filter(s => s.status === 'skipped').length, 0);
-	const pendingSets = exercises.reduce((sum, ex) => sum + ex.sets.filter(s => s.status === 'pending').length, 0);
-	const totalVolume = exercises.reduce((sum, ex) =>
-		sum + ex.sets.filter(s => s.status === 'completed' && s.actualWeight && s.actualReps)
-			.reduce((v, s) => v + (s.actualWeight ?? 0) * (s.actualReps ?? 0), 0), 0);
-	const prCount = exercises.reduce((sum, ex) => sum + ex.sets.filter(s => s.isPR).length, 0);
-	const progressPct = totalSets > 0 ? ((completedSets + skippedSets) / totalSets) * 100 : 0;
-	const allDone = pendingSets === 0;
+	let totalSets = $derived(day.exercises.reduce((sum: number, ex: any) => sum + ex.sets.length, 0));
+	let completedSets = $derived(Object.values(setStates).filter((s) => s.status === 'completed').length);
+	let skippedSets = $derived(Object.values(setStates).filter((s) => s.status === 'skipped').length);
+	let totalVolume = $derived(
+		Object.values(setStates).reduce((sum: number, s) => {
+			if (s.status === 'completed' && s.weight && s.reps) {
+				return sum + parseFloat(s.weight) * parseInt(s.reps, 10);
+			}
+			return sum;
+		}, 0)
+	);
+	let allDone = $derived(completedSets + skippedSets === totalSets && totalSets > 0);
 
-	// Per-exercise derived state
-	type ExerciseState = 'completed' | 'active' | 'upcoming';
-
-	function exerciseProgress(ex: typeof exercises[0]) {
-		const total = ex.sets.length;
-		const prSets = ex.sets.filter(s => s.status === 'completed' && s.isPR).length;
-		const activitySets = ex.sets.filter(s => s.status === 'completed' && !s.isPR).length;
-		const skippedSets = ex.sets.filter(s => s.status === 'skipped').length;
-		const done = prSets + activitySets + skippedSets;
-		// Cumulative percentages for stacked arc layers (bottom to top)
-		const prPct = total > 0 ? (prSets / total) * 100 : 0;
-		const activityPct = total > 0 ? ((prSets + activitySets) / total) * 100 : 0;
-		const allPct = total > 0 ? (done / total) * 100 : 0;
-		return { done, total, pct: allPct, prPct, activityPct, allPct, hasSkips: skippedSets > 0, hasPRs: prSets > 0 };
+	// ── PR Detection ──────────────────────────────────────────
+	function computeE1RM(weight: number, reps: number): number {
+		return weight * (1 + reps / 30);
 	}
 
-	function getExerciseState(ex: typeof exercises[0], index: number): ExerciseState {
-		const prog = exerciseProgress(ex);
+	function isPR(exerciseId: string, setId: string): boolean {
+		const s = setStates[setId];
+		if (!s || s.status !== 'completed' || !s.weight || !s.reps) return false;
+		const w = parseFloat(s.weight);
+		const r = parseInt(s.reps, 10);
+		if (w <= 0 || r <= 0) return false;
+		const hist = exerciseHistory[exerciseId];
+		if (!hist) return false;
+		return computeE1RM(w, r) > hist.bestE1RM;
+	}
+
+	let prCount = $derived(
+		day.exercises.reduce((sum: number, ex: any) =>
+			sum + ex.sets.filter((set: any) => isPR(ex.exercise_id, set.id)).length, 0)
+	);
+
+	// ── Per-Exercise Progress ─────────────────────────────────
+	const EX_ARC_R = 22;
+	const EX_ARC_C = Math.PI * EX_ARC_R;
+
+	function exerciseProgress(exercise: any) {
+		const total = exercise.sets.length;
+		let prSets = 0, actSets = 0, skipSets = 0;
+		for (const set of exercise.sets) {
+			const s = setStates[set.id];
+			if (!s) continue;
+			if (s.status === 'completed' && isPR(exercise.exercise_id, set.id)) prSets++;
+			else if (s.status === 'completed') actSets++;
+			else if (s.status === 'skipped') skipSets++;
+		}
+		const done = prSets + actSets + skipSets;
+		return {
+			done, total,
+			prPct: total > 0 ? (prSets / total) * 100 : 0,
+			activityPct: total > 0 ? ((prSets + actSets) / total) * 100 : 0,
+			allPct: total > 0 ? (done / total) * 100 : 0,
+			hasSkips: skipSets > 0,
+			hasPRs: prSets > 0
+		};
+	}
+
+	type ExerciseState = 'completed' | 'active' | 'upcoming';
+	function getExerciseState(exercise: any, index: number): ExerciseState {
+		const prog = exerciseProgress(exercise);
 		if (prog.done === prog.total) return 'completed';
-		// Active = first exercise with pending sets
-		for (let i = 0; i < exercises.length; i++) {
-			if (exercises[i].sets.some(s => s.status === 'pending')) {
-				return i === index ? 'active' : 'upcoming';
+		const sorted = day.exercises.slice().sort((a: any, b: any) => a.order_index - b.order_index);
+		for (let i = 0; i < sorted.length; i++) {
+			if (sorted[i].sets.some((set: any) => setStates[set.id]?.status === 'pending')) {
+				return sorted[i].id === exercise.id ? 'active' : 'upcoming';
 			}
 		}
 		return 'upcoming';
 	}
 
-	// Arc math for per-exercise gauge
-	const EX_ARC_R = 22;
-	const EX_ARC_C = Math.PI * EX_ARC_R;
-
-	// ── Progress bar segments ──────────────────────────────────
-	// Build ordered segments: one per set, in exercise order, colored by outcome
+	// ── Progress Bar Segments ─────────────────────────────────
 	type Segment = { color: 'activity' | 'celebrate' | 'danger' | 'pending' };
-	const segments: Segment[] = exercises.flatMap(ex =>
-		ex.sets.map(set => {
-			if (set.status === 'completed' && set.isPR) return { color: 'celebrate' as const };
-			if (set.status === 'completed') return { color: 'activity' as const };
-			if (set.status === 'skipped') return { color: 'danger' as const };
-			return { color: 'pending' as const };
-		})
+	let segments = $derived<Segment[]>(
+		day.exercises
+			.slice()
+			.sort((a: any, b: any) => a.order_index - b.order_index)
+			.flatMap((ex: any) =>
+				ex.sets
+					.slice()
+					.sort((a: any, b: any) => a.set_number - b.set_number)
+					.map((set: any) => {
+						const s = setStates[set.id];
+						if (!s) return { color: 'pending' as const };
+						if (s.status === 'completed' && isPR(ex.exercise_id, set.id)) return { color: 'celebrate' as const };
+						if (s.status === 'completed') return { color: 'activity' as const };
+						if (s.status === 'skipped') return { color: 'danger' as const };
+						return { color: 'pending' as const };
+					})
+			)
 	);
 
-	// ── Interactive State ──────────────────────────────────────
-	let bannerDismissed = $state(false);
-	let editingSet = $state<string | null>(null);
-
-	// Active exercise is auto-expanded, completed are collapsed, upcoming collapsed
+	// ── Accordion ─────────────────────────────────────────────
 	function getInitialExpanded(): string | null {
-		for (const ex of exercises) {
-			if (ex.sets.some(s => s.status === 'pending')) return ex.id;
+		const sorted = day.exercises.slice().sort((a: any, b: any) => a.order_index - b.order_index);
+		for (const ex of sorted) {
+			if (ex.sets.some((set: any) => set.log?.status !== 'completed' && set.log?.status !== 'skipped')) return ex.id;
 		}
-		return null;
+		return sorted[0]?.id ?? null;
 	}
 	let expandedExercise = $state<string | null>(getInitialExpanded());
-</script>
 
+	// ── Banner ────────────────────────────────────────────────
+	let bannerDismissed = $state(false);
+
+	// ── Mock API (local state toggle, no fetch) ───────────────
+	function handleComplete(setId: string) {
+		const s = setStates[setId];
+		if (!s) return;
+		const newStatus = s.status === 'completed' ? 'pending' : 'completed';
+		// Auto-fill with target values if no weight/reps entered
+		const exercise = day.exercises.find((ex: any) => ex.sets.some((set: any) => set.id === setId));
+		const set = exercise?.sets.find((set: any) => set.id === setId);
+		const weight = s.weight || (set?.target_weight != null ? String(set.target_weight) : '');
+		const reps = s.reps || (set?.target_reps != null ? String(set.target_reps) : '');
+		setStates[setId] = { ...s, status: newStatus, weight, reps };
+	}
+
+	function handleSkip(setId: string) {
+		const s = setStates[setId];
+		if (!s) return;
+		setStates[setId] = { ...s, status: s.status === 'skipped' ? 'pending' : 'skipped' };
+	}
+</script>
 <svelte:head>
 	<title>Push — Workout Preview</title>
 </svelte:head>
@@ -136,26 +217,46 @@
 <div class="page">
 	<!-- ═══ Header ═══ -->
 	<header class="header push-up" style="--d:0">
-		<button class="header-icon" title="Weekly agenda">
+		<a href="#" class="header-icon" title="Weekly agenda">
 			<Menu size={20} strokeWidth={2} />
-		</button>
+		</a>
 		<div class="header-center">
 			<h1 class="header-day">{DAY_NAMES[dayIndex]}, {todayDate}</h1>
-			<span class="header-split">{splitLabel}</span>
+			<span class="header-split">{day.split_label}</span>
 		</div>
-		<button class="header-icon avatar" title="Account">
-			<CircleUser size={22} strokeWidth={1.5} />
-		</button>
+		<div class="avatar-wrapper">
+			<button class="header-icon avatar" onclick={() => showMenu = !showMenu} title="Account">
+				{#if avatarUrl}
+					<img src={avatarUrl} alt="Avatar" class="avatar-img" referrerpolicy="no-referrer" />
+				{:else}
+					<span class="avatar-initials">{initials}</span>
+				{/if}
+			</button>
+			{#if showMenu}
+				<div class="avatar-menu">
+					<div class="menu-user">{user?.user_metadata?.full_name ?? user?.email ?? ''}</div>
+					<button class="menu-item" onclick={signOut}>Sign Out</button>
+				</div>
+			{/if}
+		</div>
 	</header>
 
 	<!-- ═══ Banner ═══ -->
-	{#if !bannerDismissed}
+	{#if initialBanner && !bannerDismissed}
 		<div class="banner slide-in">
-			<a href="/check-in" class="banner-link">
-				<ClipboardCheck size={14} strokeWidth={2} />
-				<span class="banner-text">Time for your weekly check-in</span>
-				<ChevronRight size={13} strokeWidth={2} />
-			</a>
+			{#if initialBanner === 'check-in'}
+				<a href="#" class="banner-link">
+					<ClipboardCheck size={14} strokeWidth={2} />
+					<span class="banner-text">Time for your weekly check-in</span>
+					<ChevronRight size={13} strokeWidth={2} />
+				</a>
+			{:else}
+				<a href="#" class="banner-link banner-link-plan">
+					<Eye size={14} strokeWidth={2} />
+					<span class="banner-text">Review your new training plan</span>
+					<ChevronRight size={13} strokeWidth={2} />
+				</a>
+			{/if}
 			<button
 				class="banner-dismiss"
 				onclick={() => bannerDismissed = true}
@@ -166,244 +267,254 @@
 		</div>
 	{/if}
 
-	<!-- ═══ Progress Bar (segmented) ═══ -->
-	{#if !allDone}
-		<div class="progress push-up" style="--d:1">
-			<div class="progress-track">
-				{#each segments as seg, i}
-					<div
-						class="progress-seg"
-						class:seg-activity={seg.color === 'activity'}
-						class:seg-celebrate={seg.color === 'celebrate'}
-						class:seg-danger={seg.color === 'danger'}
-						class:seg-pending={seg.color === 'pending'}
-						style="--seg-i:{i}"
-					></div>
-				{/each}
-			</div>
-			<span class="progress-label">{completedSets + skippedSets}/{totalSets}</span>
+	{#if day.exercises.length === 0}
+		<div class="rest-state push-up" style="--d:1">
+			<p>Rest day. Recover and prepare for your next session.</p>
+			<a href="#" class="btn btn-secondary">View Weekly Plan</a>
 		</div>
-	{/if}
-
-	<!-- ═══ Exercise Cards ═══ -->
-	<div class="exercises">
-		{#each exercises as exercise, i}
-			{@const prog = exerciseProgress(exercise)}
-			{@const exState = getExerciseState(exercise, i)}
-			{@const isExpanded = expandedExercise === exercise.id}
-			{@const hasPR = exercise.sets.some(s => s.isPR)}
-
-			<div
-				class="card push-up"
-				class:card-completed={exState === 'completed'}
-				class:card-active={exState === 'active'}
-				class:card-upcoming={exState === 'upcoming'}
-				style="--d:{i + 2}"
-			>
-				<!-- Exercise Header (always visible, tappable) -->
-				<button class="card-header" onclick={() => expandedExercise = isExpanded ? null : exercise.id}>
-					<span class="card-num" class:card-num-done={exState === 'completed' && !hasPR} class:card-num-pr={exState === 'completed' && hasPR}>
-						{#if exState === 'completed'}
-							<Check size={13} strokeWidth={3} />
-						{:else}
-							{i + 1}
-						{/if}
-					</span>
-					<div class="card-info">
-						<h3 class="card-name">{exercise.exercise_name}</h3>
-						{#if exState === 'completed' && hasPR}
-							<span class="card-pr-label">
-								<Trophy size={11} strokeWidth={2} />
-								New PR
-							</span>
-						{:else if exercise.lastWeight != null && exercise.lastReps != null}
-							<span class="card-history">
-								<TrendingUp size={11} strokeWidth={2} />
-								Last: {exercise.lastWeight} {unitPref} × {exercise.lastReps}
-							</span>
-						{:else if exercise.bestE1RM == null}
-							<span class="card-history card-new">
-								<Dumbbell size={11} strokeWidth={2} />
-								First time
-							</span>
-						{/if}
-					</div>
-
-					<!-- Per-exercise arc gauge (stacked: danger → activity → celebrate) -->
-					<div class="card-arc-wrap">
-						<svg class="card-arc" viewBox="0 0 52 32" fill="none">
-							<!-- Track -->
-							<path d="M 4 28 A {EX_ARC_R} {EX_ARC_R} 0 0 1 48 28" stroke="var(--color-border)" stroke-width="3" stroke-linecap="round" fill="none" />
-							<!-- Bottom layer: all resolved (danger shows through for skips) -->
-							{#if prog.allPct > 0 && prog.hasSkips}
-								<path d="M 4 28 A {EX_ARC_R} {EX_ARC_R} 0 0 1 48 28" stroke="var(--color-danger)" stroke-width="3" stroke-linecap="round" fill="none" stroke-dasharray={EX_ARC_C} stroke-dashoffset={EX_ARC_C * (1 - prog.allPct / 100)} class="arc-fill" />
-							{/if}
-							<!-- Middle layer: completed (mint covers over danger) -->
-							{#if prog.activityPct > 0}
-								<path d="M 4 28 A {EX_ARC_R} {EX_ARC_R} 0 0 1 48 28" stroke="var(--color-activity)" stroke-width="3" stroke-linecap="round" fill="none" stroke-dasharray={EX_ARC_C} stroke-dashoffset={EX_ARC_C * (1 - prog.activityPct / 100)} class="arc-fill" />
-							{/if}
-							<!-- Top layer: PRs (gold) -->
-							{#if prog.prPct > 0}
-								<path d="M 4 28 A {EX_ARC_R} {EX_ARC_R} 0 0 1 48 28" stroke="var(--color-celebrate)" stroke-width="3" stroke-linecap="round" fill="none" stroke-dasharray={EX_ARC_C} stroke-dashoffset={EX_ARC_C * (1 - prog.prPct / 100)} class="arc-fill" />
-							{/if}
-							<!-- No skips, no PRs: just activity -->
-							{#if prog.allPct > 0 && !prog.hasSkips && prog.prPct === 0}
-								<path d="M 4 28 A {EX_ARC_R} {EX_ARC_R} 0 0 1 48 28" stroke="var(--color-activity)" stroke-width="3" stroke-linecap="round" fill="none" stroke-dasharray={EX_ARC_C} stroke-dashoffset={EX_ARC_C * (1 - prog.allPct / 100)} class="arc-fill" />
-							{/if}
-						</svg>
-						<span class="card-arc-label">{prog.done}/{prog.total}</span>
-					</div>
-
-					<span class="card-chevron" class:card-chevron-open={isExpanded}>
-						<ChevronDown size={16} strokeWidth={2} />
-					</span>
-				</button>
-
-				{#if exercise.notes && isExpanded}
-					<p class="card-notes">{exercise.notes}</p>
-				{/if}
-
-				<!-- Set Rows (collapsible) -->
-				{#if isExpanded}
-					<div class="sets">
-						{#each exercise.sets as set}
-							{@const isEditing = editingSet === set.id}
-							<div
-								class="set-row"
-								class:completed={set.status === 'completed'}
-								class:skipped={set.status === 'skipped'}
-							>
-								<div class="set-num">
-									<span>{set.set_number}</span>
-								</div>
-
-								{#if isEditing}
-									<div class="set-edit">
-										<input type="number" class="set-input" value={set.target_weight ?? ''} placeholder="wt" />
-										<span class="set-unit-inline">{unitPref}</span>
-										<span class="set-edit-x">×</span>
-										<input type="number" class="set-input" value={set.target_reps} placeholder="reps" />
-									</div>
-								{:else if set.status === 'completed' && set.actualWeight != null}
-									<div class="set-logged">
-										<span class="set-logged-val">
-											<span class="set-weight">{set.actualWeight}</span>
-											<span class="set-unit">{unitPref}</span>
-											<span class="set-x">×</span>
-											<span class="set-reps">{set.actualReps}</span>
-										</span>
-										{#if set.isPR}
-											<span class="pr-badge">
-												<Trophy size={10} strokeWidth={2.5} />
-												PR
-											</span>
-										{/if}
-									</div>
-								{:else if set.status === 'skipped'}
-									<div class="set-logged">
-										<span class="set-logged-val set-struck">
-											{#if set.target_weight != null}
-												<span class="set-weight">{set.target_weight}</span>
-												<span class="set-unit">{unitPref}</span>
-												<span class="set-x">×</span>
-												<span class="set-reps">{set.target_reps}</span>
-											{:else}
-												<span class="set-reps">{set.target_reps} reps</span>
-											{/if}
-										</span>
-										<span class="skip-marker">Skipped</span>
-									</div>
-								{:else}
-									<button class="set-target" onclick={() => editingSet = set.id}>
-										{#if set.target_weight != null}
-											<span class="set-weight">{set.target_weight}</span>
-											<span class="set-unit">{unitPref}</span>
-											<span class="set-x">×</span>
-											<span class="set-reps">{set.target_reps}</span>
-										{:else}
-											<span class="set-reps">{set.target_reps} reps</span>
-										{/if}
-									</button>
-								{/if}
-
-								<!-- Actions: always two slots to prevent layout shift -->
-								<div class="set-actions">
-									{#if set.status === 'completed'}
-										<button class="set-btn set-btn-skip-idle set-btn-disabled" disabled>
-											<X size={13} strokeWidth={2} />
-										</button>
-										<button class="set-btn set-btn-done" title="Undo">
-											<Check size={16} strokeWidth={3} />
-										</button>
-									{:else if set.status === 'skipped'}
-										<button class="set-btn set-btn-skip-idle set-btn-skip-on" title="Undo skip">
-											<X size={13} strokeWidth={2} />
-										</button>
-										<button class="set-btn set-btn-confirm set-btn-disabled" disabled>
-											<Check size={16} strokeWidth={2.5} />
-										</button>
-									{:else}
-										<button class="set-btn set-btn-skip-idle" title="Skip set">
-											<X size={13} strokeWidth={2} />
-										</button>
-										<button class="set-btn set-btn-confirm" title="Done — log as prescribed">
-											<Check size={16} strokeWidth={2.5} />
-										</button>
-									{/if}
-								</div>
-							</div>
-						{/each}
-					</div>
-				{/if}
+	{:else}
+		<!-- ═══ Progress Bar (segmented) ═══ -->
+		{#if !allDone}
+			<div class="progress push-up" style="--d:1">
+				<div class="progress-track">
+					{#each segments as seg, i}
+						<div
+							class="progress-seg"
+							class:seg-activity={seg.color === 'activity'}
+							class:seg-celebrate={seg.color === 'celebrate'}
+							class:seg-danger={seg.color === 'danger'}
+							class:seg-pending={seg.color === 'pending'}
+							style="--seg-i:{i}"
+						></div>
+					{/each}
+				</div>
+				<span class="progress-label">{completedSets + skippedSets}/{totalSets}</span>
 			</div>
-		{/each}
-	</div>
+		{/if}
 
-	<!-- ═══ Completion Summary (replaces progress bar when all done) ═══ -->
-	{#if allDone}
-		<div class="summary push-up" style="--d:5">
-			<div class="summary-header">
-				<div class="summary-progress-ring">
-					<svg viewBox="0 0 48 48" fill="none">
-						<circle cx="24" cy="24" r="20" stroke="var(--color-border)" stroke-width="3" fill="none" />
-						<circle cx="24" cy="24" r="20" stroke="var(--color-celebrate)" stroke-width="3" fill="none"
-							stroke-dasharray={Math.PI * 40}
-							stroke-dashoffset="0"
-							stroke-linecap="round"
-							transform="rotate(-90 24 24)"
-						/>
-					</svg>
-					<Check size={20} strokeWidth={3} class="summary-check" />
-				</div>
-				<h3 class="summary-title">Workout Complete</h3>
-			</div>
-			<div class="summary-stats">
-				<div class="summary-stat summary-done">
-					<span class="summary-val">{completedSets}</span>
-					<span class="summary-label">Done</span>
-				</div>
-				<div class="summary-stat summary-skipped">
-					<span class="summary-val">{skippedSets}</span>
-					<span class="summary-label">Skipped</span>
-				</div>
-				<div class="summary-stat">
-					<span class="summary-val summary-volume">
-						<Flame size={18} strokeWidth={2} />
-						{totalVolume.toLocaleString()}
-					</span>
-					<span class="summary-label">Volume</span>
-				</div>
-				{#if prCount > 0}
-					<div class="summary-stat summary-pr">
-						<span class="summary-val">
-							<Trophy size={18} strokeWidth={2} />
-							{prCount}
+		<!-- ═══ Exercise Cards ═══ -->
+		<div class="exercises">
+			{#each day.exercises.slice().sort((a, b) => a.order_index - b.order_index) as exercise, i}
+				{@const prog = exerciseProgress(exercise)}
+				{@const exState = getExerciseState(exercise, i)}
+				{@const isExpanded = expandedExercise === exercise.id}
+				{@const hasPR = exercise.sets.some((s) => isPR(exercise.exercise_id, s.id))}
+				{@const hist = exerciseHistory[exercise.exercise_id]}
+
+				<div
+					class="card push-up"
+					class:card-completed={exState === 'completed'}
+					class:card-active={exState === 'active'}
+					class:card-upcoming={exState === 'upcoming'}
+					style="--d:{i + 2}"
+				>
+					<!-- Exercise Header (tappable accordion) -->
+					<button class="card-header" onclick={() => expandedExercise = isExpanded ? null : exercise.id}>
+						<span class="card-num" class:card-num-done={exState === 'completed' && !hasPR} class:card-num-pr={exState === 'completed' && hasPR}>
+							{#if exState === 'completed'}
+								<Check size={13} strokeWidth={3} />
+							{:else}
+								{i + 1}
+							{/if}
 						</span>
-						<span class="summary-label">PRs</span>
+						<div class="card-info">
+							<a
+								href="/exercise/{exercise.exercise_id.replace(/\s+/g, '-')}?name={encodeURIComponent(exercise.exercise_name)}"
+								class="card-name-link"
+								onclick={(e) => e.stopPropagation()}
+							>
+								<h3 class="card-name">{exercise.exercise_name}</h3>
+							</a>
+							{#if exState === 'completed' && hasPR}
+								<span class="card-pr-label">
+									<Trophy size={11} strokeWidth={2} />
+									New PR
+								</span>
+							{:else if hist}
+								<span class="card-history">
+									<TrendingUp size={11} strokeWidth={2} />
+									Last: {hist.lastWeight} {unitPref} × {hist.lastReps}
+								</span>
+							{:else}
+								<span class="card-history card-new">
+									<Dumbbell size={11} strokeWidth={2} />
+									First time
+								</span>
+							{/if}
+						</div>
+
+						<!-- Per-exercise arc gauge -->
+						<div class="card-arc-wrap">
+							<svg class="card-arc" viewBox="0 0 52 32" fill="none">
+								<path d="M 4 28 A {EX_ARC_R} {EX_ARC_R} 0 0 1 48 28" stroke="var(--color-border)" stroke-width="3" stroke-linecap="round" fill="none" />
+								{#if prog.allPct > 0 && prog.hasSkips}
+									<path d="M 4 28 A {EX_ARC_R} {EX_ARC_R} 0 0 1 48 28" stroke="var(--color-danger)" stroke-width="3" stroke-linecap="round" fill="none" stroke-dasharray={EX_ARC_C} stroke-dashoffset={EX_ARC_C * (1 - prog.allPct / 100)} class="arc-fill" />
+								{/if}
+								{#if prog.activityPct > 0}
+									<path d="M 4 28 A {EX_ARC_R} {EX_ARC_R} 0 0 1 48 28" stroke="var(--color-activity)" stroke-width="3" stroke-linecap="round" fill="none" stroke-dasharray={EX_ARC_C} stroke-dashoffset={EX_ARC_C * (1 - prog.activityPct / 100)} class="arc-fill" />
+								{/if}
+								{#if prog.prPct > 0}
+									<path d="M 4 28 A {EX_ARC_R} {EX_ARC_R} 0 0 1 48 28" stroke="var(--color-celebrate)" stroke-width="3" stroke-linecap="round" fill="none" stroke-dasharray={EX_ARC_C} stroke-dashoffset={EX_ARC_C * (1 - prog.prPct / 100)} class="arc-fill" />
+								{/if}
+								{#if prog.allPct > 0 && !prog.hasSkips && prog.prPct === 0}
+									<path d="M 4 28 A {EX_ARC_R} {EX_ARC_R} 0 0 1 48 28" stroke="var(--color-activity)" stroke-width="3" stroke-linecap="round" fill="none" stroke-dasharray={EX_ARC_C} stroke-dashoffset={EX_ARC_C * (1 - prog.allPct / 100)} class="arc-fill" />
+								{/if}
+							</svg>
+							<span class="card-arc-label">{prog.done}/{prog.total}</span>
+						</div>
+
+						<span class="card-chevron" class:card-chevron-open={isExpanded}>
+							<ChevronDown size={16} strokeWidth={2} />
+						</span>
+					</button>
+
+					{#if exercise.notes && isExpanded}
+						<p class="card-notes">{exercise.notes}</p>
+					{/if}
+
+					<!-- Set Rows (collapsible) -->
+					{#if isExpanded}
+						<div class="sets">
+							{#each exercise.sets.slice().sort((a, b) => a.set_number - b.set_number) as set}
+								{@const s = setStates[set.id]}
+								{@const setIsPR = isPR(exercise.exercise_id, set.id)}
+								{#if s}
+									<div
+										class="set-row"
+										class:completed={s.status === 'completed'}
+										class:skipped={s.status === 'skipped'}
+									>
+										<div class="set-num">
+											<span>{set.set_number}</span>
+										</div>
+
+										{#if s.status === 'completed' && s.weight}
+											<div class="set-logged">
+												<span class="set-logged-val">
+													<span class="set-weight">{s.weight}</span>
+													<span class="set-unit">{unitPref}</span>
+													<span class="set-x">×</span>
+													<span class="set-reps">{s.reps}</span>
+												</span>
+												{#if setIsPR}
+													<span class="pr-badge">
+														<Trophy size={10} strokeWidth={2.5} />
+														PR
+													</span>
+												{/if}
+											</div>
+										{:else if s.status === 'skipped'}
+											<div class="set-logged">
+												<span class="set-logged-val set-struck">
+													<span class="set-weight">{set.target_weight ?? '—'}</span>
+													{#if set.target_weight != null}<span class="set-unit">{unitPref}</span>{/if}
+													<span class="set-x">×</span>
+													<span class="set-reps">{set.target_reps}</span>
+												</span>
+												<span class="skip-marker">Skipped</span>
+											</div>
+										{:else}
+											<div class="set-edit">
+												<input
+													type="number"
+													inputmode="decimal"
+													class="set-input"
+													placeholder={set.target_weight != null ? String(set.target_weight) : '—'}
+													bind:value={s.weight}
+												/>
+												<span class="set-unit-inline">{unitPref}</span>
+												<span class="set-edit-x">×</span>
+												<input
+													type="number"
+													inputmode="numeric"
+													class="set-input"
+													placeholder={String(set.target_reps)}
+													bind:value={s.reps}
+												/>
+											</div>
+										{/if}
+
+										<!-- Action buttons -->
+										<div class="set-actions">
+											{#if s.status === 'completed'}
+												<button class="set-btn set-btn-skip-idle set-btn-disabled" disabled>
+													<X size={13} strokeWidth={2} />
+												</button>
+												<button class="set-btn set-btn-done" onclick={() => handleComplete(set.id)} disabled={s.saving} title="Undo">
+													<Check size={16} strokeWidth={3} />
+												</button>
+											{:else if s.status === 'skipped'}
+												<button class="set-btn set-btn-skip-idle set-btn-skip-on" onclick={() => handleSkip(set.id)} disabled={s.saving} title="Undo skip">
+													<X size={13} strokeWidth={2} />
+												</button>
+												<button class="set-btn set-btn-confirm set-btn-disabled" disabled>
+													<Check size={16} strokeWidth={2.5} />
+												</button>
+											{:else}
+												<button class="set-btn set-btn-skip-idle" onclick={() => handleSkip(set.id)} disabled={s.saving} title="Skip set">
+													<X size={13} strokeWidth={2} />
+												</button>
+												<button class="set-btn set-btn-confirm" onclick={() => handleComplete(set.id)} disabled={s.saving} title="Done — log as prescribed">
+													<Check size={16} strokeWidth={2.5} />
+												</button>
+											{/if}
+										</div>
+									</div>
+								{/if}
+							{/each}
+						</div>
+					{/if}
+				</div>
+			{/each}
+		</div>
+
+		<!-- ═══ Completion Summary ═══ -->
+		{#if allDone}
+			<div class="summary push-up" style="--d:5">
+				<div class="summary-header">
+					<div class="summary-progress-ring">
+						<svg viewBox="0 0 48 48" fill="none">
+							<circle cx="24" cy="24" r="20" stroke="var(--color-border)" stroke-width="3" fill="none" />
+							<circle cx="24" cy="24" r="20" stroke="var(--color-celebrate)" stroke-width="3" fill="none"
+								stroke-dasharray={Math.PI * 40}
+								stroke-dashoffset="0"
+								stroke-linecap="round"
+								transform="rotate(-90 24 24)"
+							/>
+						</svg>
+						<Check size={20} strokeWidth={3} class="summary-check" />
 					</div>
-				{/if}
+					<h3 class="summary-title">Workout Complete</h3>
+				</div>
+				<div class="summary-stats">
+					<div class="summary-stat summary-done">
+						<span class="summary-val">{completedSets}</span>
+						<span class="summary-label">Done</span>
+					</div>
+					<div class="summary-stat summary-skipped">
+						<span class="summary-val">{skippedSets}</span>
+						<span class="summary-label">Skipped</span>
+					</div>
+					<div class="summary-stat">
+						<span class="summary-val summary-volume">
+							<Flame size={18} strokeWidth={2} />
+							{totalVolume.toLocaleString()}
+						</span>
+						<span class="summary-label">Volume</span>
+					</div>
+					{#if prCount > 0}
+						<div class="summary-stat summary-pr">
+							<span class="summary-val">
+								<Trophy size={18} strokeWidth={2} />
+								{prCount}
+							</span>
+							<span class="summary-label">PRs</span>
+						</div>
+					{/if}
+				</div>
+				<a href="#" class="btn btn-secondary summary-cta">View Weekly Plan</a>
 			</div>
-			</div>
+		{/if}
 	{/if}
 </div>
 
@@ -470,6 +581,7 @@
 		cursor: pointer;
 		transition: all var(--duration-normal) var(--ease-out);
 		flex-shrink: 0;
+		text-decoration: none;
 	}
 
 	.header-icon:hover {
@@ -479,6 +591,66 @@
 
 	.header-icon.avatar {
 		border-radius: var(--radius-full);
+		padding: 0;
+		overflow: hidden;
+	}
+
+	.avatar-img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+
+	.avatar-initials {
+		font-family: var(--font-display);
+		font-size: 0.7rem;
+		font-weight: 700;
+		color: var(--color-text-secondary);
+	}
+
+	.avatar-wrapper {
+		position: relative;
+	}
+
+	.avatar-menu {
+		position: absolute;
+		top: calc(100% + 6px);
+		right: 0;
+		min-width: 180px;
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+		z-index: 100;
+		overflow: hidden;
+	}
+
+	.menu-user {
+		padding: 0.75rem 1rem;
+		font-size: 0.75rem;
+		color: var(--color-text-secondary);
+		border-bottom: 1px solid var(--color-border);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.menu-item {
+		display: block;
+		width: 100%;
+		padding: 0.65rem 1rem;
+		background: none;
+		border: none;
+		color: var(--color-text);
+		font-family: var(--font-body);
+		font-size: 0.85rem;
+		text-align: left;
+		cursor: pointer;
+		transition: background 0.1s ease;
+	}
+
+	.menu-item:hover {
+		background: rgba(255, 255, 255, 0.05);
 	}
 
 	.header-center {
@@ -501,7 +673,7 @@
 		text-transform: capitalize;
 	}
 
-	/* ═══ Banner (bold notification — distinct from cards, glow-from-within) ═══ */
+	/* ═══ Banner ═══ */
 	.banner {
 		display: flex;
 		align-items: center;
@@ -523,9 +695,13 @@
 		display: flex;
 		align-items: center;
 		gap: var(--space-2);
-		padding: var(--space-2-5, var(--space-3)) var(--space-3);
+		padding: var(--space-3);
 		text-decoration: none;
 		color: var(--color-reflect);
+	}
+
+	.banner-link-plan {
+		color: var(--color-activity);
 	}
 
 	.banner-text {
@@ -538,6 +714,10 @@
 	.banner-link > :global(svg:last-of-type) {
 		color: var(--color-reflect);
 		flex-shrink: 0;
+	}
+
+	.banner-link-plan > :global(svg:last-of-type) {
+		color: var(--color-activity);
 	}
 
 	.banner-dismiss {
@@ -554,6 +734,18 @@
 
 	.banner-dismiss:hover {
 		color: var(--color-text-secondary);
+	}
+
+	/* ═══ Rest State ═══ */
+	.rest-state {
+		text-align: center;
+		padding: 3rem 1rem;
+		color: var(--color-text-secondary);
+		font-size: var(--text-base);
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: var(--space-4);
 	}
 
 	/* ═══ Progress Bar (segmented) ═══ */
@@ -617,7 +809,6 @@
 		transition: all var(--duration-normal) var(--ease-out);
 	}
 
-	/* State: Completed — muted, settled */
 	.card-completed {
 		opacity: var(--opacity-muted);
 		box-shadow: none;
@@ -627,14 +818,18 @@
 		opacity: var(--opacity-hover);
 	}
 
-	/* State: Active — prominent, glow */
 	.card-active {
-		box-shadow: var(--shadow-sm), 0 2px 12px rgba(45, 212, 168, 0.08);
+		border-color: var(--color-activity);
+		box-shadow: var(--shadow-sm), 0 2px 16px rgba(45, 212, 168, 0.1);
 	}
 
-	/* State: Upcoming — default, no glow */
 	.card-upcoming {
-		box-shadow: var(--shadow-sm);
+		opacity: 0.6;
+		box-shadow: none;
+	}
+
+	.card-upcoming:hover {
+		opacity: 0.8;
 	}
 
 	.card-header {
@@ -685,6 +880,15 @@
 		min-width: 0;
 	}
 
+	.card-name-link {
+		text-decoration: none;
+		color: inherit;
+	}
+
+	.card-name-link:hover .card-name {
+		color: var(--color-activity);
+	}
+
 	.card-name {
 		font-family: var(--font-display);
 		font-size: var(--text-base);
@@ -692,6 +896,7 @@
 		text-transform: capitalize;
 		line-height: var(--leading-tight);
 		letter-spacing: var(--tracking-tight);
+		transition: color var(--duration-fast);
 	}
 
 	.card-history {
@@ -753,7 +958,6 @@
 		font-weight: var(--weight-bold);
 	}
 
-	/* Chevron toggle */
 	.card-chevron {
 		color: var(--color-text-tertiary);
 		transition: transform var(--duration-normal) var(--ease-out);
@@ -837,7 +1041,6 @@
 		align-items: baseline;
 	}
 
-	/* Strikethrough for skipped sets */
 	.set-struck {
 		text-decoration: line-through;
 		text-decoration-color: var(--color-text-tertiary);
@@ -913,14 +1116,19 @@
 		width: 56px;
 		padding: var(--space-1-5) var(--space-2);
 		background: var(--color-bg);
-		border: 1.5px solid var(--color-activity);
+		border: 1.5px solid var(--color-border);
 		border-radius: var(--radius-sm);
 		color: var(--color-text);
 		font-family: var(--font-mono);
 		font-size: var(--text-sm);
 		text-align: center;
 		outline: none;
+		transition: border-color var(--duration-fast);
 		-moz-appearance: textfield;
+	}
+
+	.set-input:focus {
+		border-color: var(--color-activity);
 	}
 
 	.set-input::-webkit-outer-spin-button,
@@ -939,18 +1147,12 @@
 		font-size: var(--text-sm);
 	}
 
-	/* ═══ Set Action Buttons (fixed 2-slot layout) ═══ */
+	/* ═══ Set Action Buttons ═══ */
 	.set-actions {
 		flex-shrink: 0;
 		display: flex;
 		align-items: center;
 		gap: var(--space-1-5);
-	}
-
-	/* Invisible placeholder to maintain layout when one button is hidden */
-	.set-btn-placeholder {
-		width: 26px;
-		height: 26px;
 	}
 
 	.set-btn {
@@ -970,7 +1172,7 @@
 		height: 34px;
 	}
 
-	.set-btn-confirm:hover {
+	.set-btn-confirm:hover:not(:disabled) {
 		border-color: var(--color-activity);
 		color: var(--color-activity);
 		background: var(--color-activity-subtle);
@@ -984,18 +1186,16 @@
 		opacity: var(--opacity-muted);
 	}
 
-	.set-btn-skip-idle:hover {
+	.set-btn-skip-idle:hover:not(:disabled) {
 		color: var(--color-danger);
 		opacity: 1;
 	}
 
-	/* Skip activated — just turns red, no background/border change */
 	.set-btn-skip-on {
 		color: var(--color-danger);
 		opacity: 1;
 	}
 
-	/* Disabled button — stays in layout but non-interactive */
 	.set-btn-disabled {
 		opacity: 0.3;
 		pointer-events: none;
@@ -1107,4 +1307,34 @@
 		color: var(--color-celebrate);
 	}
 
+	.summary-cta {
+		margin-top: var(--space-2);
+	}
+
+	/* ═══ Buttons ═══ */
+	.btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0.75rem 1.5rem;
+		border-radius: var(--radius-sm);
+		font-family: var(--font-body);
+		font-size: var(--text-sm);
+		font-weight: var(--weight-semibold);
+		cursor: pointer;
+		border: none;
+		text-decoration: none;
+		transition: all var(--duration-normal) var(--ease-out);
+	}
+
+	.btn-secondary {
+		background: transparent;
+		color: var(--color-text-secondary);
+		border: 1.5px solid var(--color-border);
+	}
+
+	.btn-secondary:hover {
+		border-color: var(--color-border-strong);
+		color: var(--color-text);
+	}
 </style>

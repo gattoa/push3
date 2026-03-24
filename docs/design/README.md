@@ -25,30 +25,23 @@ See [UX-DESIGN-BRIEF.md](UX-DESIGN-BRIEF.md) Section 4 and Section 8 (Cluster A 
 - **Banner system:** Plan review and check-in banners on Workout tab. At most one at a time. Persist 48 hours or until dismissed.
 - **Exercise swaps:** Swipe left on exercise card → inline expansion with 3 AI-pre-generated alternatives. Target: alternatives generated during plan generation. Requires isolated prompt testing before implementation.
 
-## Design System Reference
+## Brand & Design System
 
-| Token | Value | Usage |
-|---|---|---|
-| `--color-bg` | `#0a0a0a` | Page background |
-| `--color-surface` | `#141414` | Cards, elevated surfaces |
-| `--color-border` | `#262626` | Subtle borders |
-| `--color-text` | `#fafafa` | Primary text |
-| `--color-text-muted` | `#a1a1aa` | Secondary/label text |
-| `--color-accent` | `#22c55e` | CTAs, active states, progress |
-| `--font-display` | JetBrains Mono | Headers, numbers, labels |
-| `--font-body` | Inter | Body text, form inputs |
-| `--radius` | `12px` | Cards |
-| `--radius-sm` | `8px` | Buttons, smaller elements |
+- **[Brand Guidelines](brand-guidelines.md)** — Visual identity, color semantics, shape language, motion, and mood. Source of truth for all design decisions.
+- **`src/styles/tokens.css`** — CSS variables implementing the brand guidelines.
+- **`/design-system`** — Live preview page showing tokens and components in action.
 
-## Page Documents
+## Page Specifications
+
+All page-level design specs live in [`pages/`](pages/).
 
 | Page | Doc | Status |
 |---|---|---|
-| Daily Workout (`/workout`) | [daily-workout.md](daily-workout.md) | Current (v0.2.0 — banners, historical perf, rest day state, exercise swaps, completion summary updated) |
-| Weekly Agenda (`/plan`) | [weekly-agenda.md](weekly-agenda.md) | Current (v0.2.0 — check-in link removed, plan review destination added) |
-| Exercise Detail (`/exercise/[id]`) | [exercise-detail.md](exercise-detail.md) | Current |
-| Weekly Check-In (`/check-in`) | [check-in.md](check-in.md) | Current (v0.2.0 — entry point consolidated to banner-only) |
-| Onboarding (`/onboarding`) | [onboarding.md](onboarding.md) | Current (v0.2.0 — reordered steps, DOB + gender, unit pref removed, injury yes/no gate, schema reqs) |
-| Progress (`/progress`) | [progress.md](progress.md) | Current |
+| Daily Workout (`/workout`) | [pages/daily-workout.md](pages/daily-workout.md) | Current (v0.2.0 — banners, historical perf, rest day state, exercise swaps, completion summary updated) |
+| Weekly Agenda (`/plan`) | [pages/weekly-agenda.md](pages/weekly-agenda.md) | Current (v0.2.0 — check-in link removed, plan review destination added) |
+| Exercise Detail (`/exercise/[id]`) | [pages/exercise-detail.md](pages/exercise-detail.md) | Current |
+| Weekly Check-In (`/check-in`) | [pages/check-in.md](pages/check-in.md) | Current (v0.2.0 — entry point consolidated to banner-only) |
+| Onboarding (`/onboarding`) | [pages/onboarding.md](pages/onboarding.md) | Current (v0.2.0 — reordered steps, DOB + gender, unit pref removed, injury yes/no gate, schema reqs) |
+| Progress (`/progress`) | [pages/progress.md](pages/progress.md) | Current |
 | Login (`/`) | — | No changes planned |
 | Plan Generation (`/plan/generate`) | — | No changes planned |
