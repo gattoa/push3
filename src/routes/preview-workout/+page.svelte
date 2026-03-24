@@ -378,17 +378,17 @@
 				<h3 class="summary-title">Workout Complete</h3>
 			</div>
 			<div class="summary-stats">
-				<div class="summary-stat">
+				<div class="summary-stat summary-done">
 					<span class="summary-val">{completedSets}</span>
 					<span class="summary-label">Done</span>
 				</div>
-				<div class="summary-stat">
+				<div class="summary-stat summary-skipped">
 					<span class="summary-val">{skippedSets}</span>
 					<span class="summary-label">Skipped</span>
 				</div>
 				<div class="summary-stat">
 					<span class="summary-val summary-volume">
-						<Flame size={14} strokeWidth={2} />
+						<Flame size={18} strokeWidth={2} />
 						{totalVolume.toLocaleString()}
 					</span>
 					<span class="summary-label">Volume</span>
@@ -396,18 +396,14 @@
 				{#if prCount > 0}
 					<div class="summary-stat summary-pr">
 						<span class="summary-val">
-							<Trophy size={14} strokeWidth={2} />
+							<Trophy size={18} strokeWidth={2} />
 							{prCount}
 						</span>
 						<span class="summary-label">PRs</span>
 					</div>
 				{/if}
 			</div>
-			<div class="summary-ctas">
-				<a href="/plan" class="btn btn-secondary">View Weekly Plan</a>
-				<a href="/check-in" class="btn btn-celebrate">Weekly Check-In</a>
 			</div>
-		</div>
 	{/if}
 </div>
 
@@ -1077,13 +1073,14 @@
 		font-size: var(--text-2xl);
 		font-weight: var(--weight-extrabold);
 		line-height: 1;
+		min-height: 1.8rem;
 		display: inline-flex;
 		align-items: center;
 		gap: var(--space-1);
 	}
 
 	.summary-volume {
-		font-size: var(--text-lg);
+		font-size: var(--text-xl);
 	}
 
 	.summary-label {
@@ -1094,6 +1091,14 @@
 		font-weight: var(--weight-semibold);
 	}
 
+	.summary-done .summary-val {
+		color: var(--color-activity);
+	}
+
+	.summary-skipped .summary-val {
+		color: var(--color-danger);
+	}
+
 	.summary-pr .summary-val {
 		color: var(--color-celebrate);
 	}
@@ -1102,45 +1107,4 @@
 		color: var(--color-celebrate);
 	}
 
-	.summary-ctas {
-		display: flex;
-		gap: var(--space-3);
-		justify-content: center;
-	}
-
-	/* ═══ Buttons ═══ */
-	.btn {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		padding: var(--space-3) var(--space-5);
-		border-radius: var(--radius-md);
-		font-family: var(--font-body);
-		font-size: var(--text-sm);
-		font-weight: var(--weight-semibold);
-		cursor: pointer;
-		border: none;
-		text-decoration: none;
-		transition: all var(--duration-normal) var(--ease-out);
-	}
-
-	.btn-celebrate {
-		background: var(--color-celebrate);
-		color: var(--color-text-inverse);
-	}
-
-	.btn-celebrate:hover {
-		background: var(--color-celebrate-hover);
-	}
-
-	.btn-secondary {
-		background: transparent;
-		color: var(--color-text-secondary);
-		border: 1.5px solid var(--color-border);
-	}
-
-	.btn-secondary:hover {
-		border-color: var(--color-border-strong);
-		color: var(--color-text);
-	}
 </style>

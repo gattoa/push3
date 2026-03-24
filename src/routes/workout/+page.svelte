@@ -296,11 +296,7 @@
 						<span class="stat-label">Volume ({unitPref})</span>
 					</div>
 				</div>
-				<div class="summary-actions">
-				<a href="/plan" class="btn btn-secondary">View Weekly Plan</a>
-				<a href="/check-in" class="btn btn-primary">Weekly Check-In</a>
-			</div>
-			</div>
+				</div>
 		{/if}
 	{/if}
 </div>
@@ -690,11 +686,6 @@
 		text-align: center;
 	}
 
-	.summary-actions {
-		display: flex;
-		gap: 0.75rem;
-		justify-content: center;
-	}
 
 	.summary-card h3 {
 		font-family: var(--font-display);
