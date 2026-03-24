@@ -90,15 +90,15 @@ Exercise cards use an **accordion pattern**: only the active exercise is expande
 | State | Visual Treatment | Badge | Expanded |
 |---|---|---|---|
 | **Completed** | Dimmed (`--opacity-muted`), no shadow | Grey check (or gold check if PR) | No (collapsed) |
-| **Active** | Full opacity, mint border (`--color-activity`), glow shadow | Number in mint circle | Yes (auto-expanded) |
-| **Upcoming** | Reduced opacity (0.6), no shadow | Number in mint circle | No (collapsed) |
+| **Active** | Full opacity, subtle mint glow shadow (no colored border) | Number in mint circle | Yes (auto-expanded) |
+| **Upcoming** | Reduced opacity (0.6), no shadow | Number in neutral circle (`--color-text-secondary` on `--color-border`) | No (collapsed) |
 
 - Tapping any card header toggles expand/collapse.
 - "Active" = first exercise in order that has pending sets.
 
 #### Card Header (always visible)
-- **Number badge:** 26px circle. Mint background when active/upcoming. Grey with check icon when completed. Gold with check icon when completed with PR.
-- **Exercise name:** Manrope semibold, capitalize. Links to `/exercise/[id]` (tap stops propagation from accordion toggle).
+- **Number badge:** 26px circle. Mint background when active. Neutral (`--color-text-secondary` on `--color-border`) when upcoming. Grey with check icon when completed. Gold with check icon when completed with PR.
+- **Exercise name:** Manrope semibold, capitalize. Links to `/exercise/[id]` only when expanded (tap stops propagation from accordion toggle). When collapsed, the name is plain text — the entire header acts as a single expand target with no competing tap targets.
 - **History line:** Below name. Three variants:
   - `↗ Last: {weight} {unit} × {reps}` — when historical data exists (Lucide `TrendingUp`, mono font, tertiary color)
   - `🏋 First time` — when no history exists (Lucide `Dumbbell`, mint italic)
@@ -112,25 +112,56 @@ Exercise cards use an **accordion pattern**: only the active exercise is expande
 
 ### Set Interaction
 
-Each set row shows in one of three states:
+All three set states use the **same unified layout** — a single row structure with inline inputs that adapt visually per state. This ensures perfect alignment across pending, completed, and skipped rows and eliminates layout shift on state transitions.
+
+#### Unified Row Structure
+```
+[set-num] [input-wrap: value + unit] [×] [input-wrap: reps] [badges?] [skip btn] [confirm btn]
+```
+- The input-wrap groups the numeric input and its unit label ("lb") into a single visual unit.
+- Inputs are always present in the DOM. State changes toggle `readonly`, styling, and opacity — not markup structure.
+
+#### Visual Hierarchy — Athlete Focus
+The pending set is the athlete's next action. Everything else should recede.
+
+| State | Row Opacity | Text Color | Text Weight | Background | Rationale |
+|---|---|---|---|---|---|
+| **Pending** | 1.0 | `--color-text` | `medium` | Default (`--color-bg-raised`) | **Primary focus.** This is what the athlete needs to do next. |
+| **Completed** | 0.55 | `--color-text-secondary` | `medium` | Default (`--color-bg-raised`) | **Recedes.** Done — quiet confirmation, doesn't compete for attention. |
+| **Skipped** | 1.0 | `--color-text-tertiary` | `medium` | Default (`--color-bg-raised`) | Struck-through values + rose "Skipped" chip. Data point, not judgment. |
+
+#### "Text Until Tapped" Input Pattern
+Inputs appear as **plain inline text** at rest — no visible borders or backgrounds. On tap/focus, they reveal themselves as editable fields with a mint border and background. This reduces visual noise and follows the pattern validated by Strong and Hevy ([F004]: "2–3 tap quick-complete" with large thumb-friendly targets).
+
+**Resting state:**
+- `border: transparent`, `background: transparent`
+- Placeholder values shown in `--color-text` (pending) — the prescribed target
+- Input + unit label grouped in a wrapper (`set-input-wrap`) with `inline-flex` + `align-items: baseline`
+
+**Focused state (`:focus-within` on wrapper):**
+- `border-color: var(--color-activity)`, `background: var(--color-bg)`
+- The wrapper gains the border, encompassing both the value and unit label as one field
+- Text centers within the field for data entry
+
+**Completed/readonly state:**
+- Same wrapper layout, `readonly` attribute on inputs
+- `cursor: default`, reduced text color
+- No focus styling (readonly inputs don't activate the wrapper)
 
 #### Pending State
-- Set number (mono, tertiary) | Weight input + unit label + × + Reps input | Skip (×) + Confirm (✓) buttons
 - Inputs show placeholder values from the prescribed target (not pre-filled — user must actively enter or accept)
-- Input borders highlight mint on focus
+- Placeholders render in `--color-text` at full brightness — this is the primary call to action
 - **Confirm (✓):** Logs the set with entered values. If no values entered, logs with prescribed target values (auto-fill on confirm).
 - **Skip (×):** Small, muted, left of confirm button. Opacity 0.6 by default, turns rose on hover.
 
 #### Completed State
-- Set number | `{weight} {unit}  ×  {reps}` + optional PR badge | Disabled skip (×) + Active undo (✓)
-- **Weight display:** `{weight}` bold + `{unit}` small tertiary + `×` tertiary with `--space-2` margins + `{reps}` medium
-- **PR badge:** Gold pill — Lucide `Trophy` (10px) + "PR" text. `--color-celebrate` on `--color-celebrate-muted`. Appears inline after the logged values.
-- **Row background:** `--color-activity-subtle` tint
-- **Undo:** Tap ✓ again to return to pending state.
+- Same input layout with `readonly` — values display inline, perfectly aligned with pending rows
+- **PR badge:** Gold pill — Lucide `Trophy` (10px) + "PR" text. `--color-celebrate` on `--color-celebrate-muted`. Appears inline after the values.
+- **Row fades to 0.55 opacity** — done work recedes so the pending set stands out
+- **Undo:** Tap ✓ again to return to pending state. Row returns to full opacity.
 
 #### Skipped State
-- Set number | ~~target values~~ struck-through + "SKIPPED" chip | Active undo (×) + Disabled confirm (✓)
-- **Struck-through target:** Original prescription with `text-decoration: line-through` in tertiary color
+- `text-decoration: line-through` on inputs, unit label, and × separator
 - **Skip chip:** Rose pill badge — "SKIPPED" text in `--color-danger` on `--color-danger-muted`
 - **× button:** Turns rose (`--color-danger`), stays in left slot position — no layout shift
 - **✓ button:** Dims to 0.3 opacity, pointer-events none

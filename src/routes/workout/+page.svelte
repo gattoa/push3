@@ -1,18 +1,21 @@
 <script lang="ts">
 	import {
-		Check, X, Menu, Trophy, ClipboardCheck,
-		ChevronRight, ChevronDown, TrendingUp, Flame, Dumbbell, Eye
+		Check, X, Menu, Trophy,
+		ChevronDown, TrendingUp, Flame, Dumbbell, Eye
 	} from 'lucide-svelte';
 	import type { FullPlanDay, FullPlanExercise, FullPlanSet } from '$lib/types/database';
+	import { isPR as isPRUtil } from '$lib/utils/pr';
+	import { shouldShowBanner, dismissBanner } from '$lib/utils/banner';
+	import Banner from '$lib/components/Banner.svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 
 	let { data } = $props();
-	const day: FullPlanDay = data.day;
-	const dayIndex: number = data.dayIndex;
-	const unitPref: string = data.unitPref;
-	const exerciseHistory: Record<string, { lastWeight: number; lastReps: number; bestE1RM: number }> = data.exerciseHistory;
-	const initialBanner: 'check-in' | 'plan-review' | null = data.banner;
+	const day = $derived(data.day as FullPlanDay);
+	const dayIndex = $derived(data.dayIndex as number);
+	const unitPref = $derived(data.unitPref as string);
+	const exerciseHistory = $derived(data.exerciseHistory as Record<string, { lastWeight: number; lastReps: number; bestE1RM: number }>);
+	const initialBanner = $derived(data.banner as 'check-in' | 'plan-review' | null);
 
 	// Avatar menu
 	let showMenu = $state(false);
@@ -26,7 +29,7 @@
 
 	async function signOut() {
 		showMenu = false;
-		await page.data.supabase.auth.signOut();
+		await page.data.supabase?.auth.signOut();
 		goto('/');
 	}
 
@@ -74,20 +77,14 @@
 	let allDone = $derived(completedSets + skippedSets === totalSets && totalSets > 0);
 
 	// ── PR Detection ──────────────────────────────────────────
-	// Epley formula: E1RM = weight × (1 + reps / 30)
-	function computeE1RM(weight: number, reps: number): number {
-		return weight * (1 + reps / 30);
-	}
-
 	function isPR(exerciseId: string, setId: string): boolean {
 		const s = setStates[setId];
 		if (!s || s.status !== 'completed' || !s.weight || !s.reps) return false;
 		const w = parseFloat(s.weight);
 		const r = parseInt(s.reps, 10);
-		if (w <= 0 || r <= 0) return false;
 		const hist = exerciseHistory[exerciseId];
-		if (!hist) return false; // No baseline — can't determine PR
-		return computeE1RM(w, r) > hist.bestE1RM;
+		if (!hist) return false;
+		return isPRUtil(w, r, hist.bestE1RM);
 	}
 
 	let prCount = $derived(
@@ -165,8 +162,15 @@
 	}
 	let expandedExercise = $state<string | null>(getInitialExpanded());
 
-	// ── Banner ────────────────────────────────────────────────
-	let bannerDismissed = $state(false);
+	// ── Banner (localStorage-backed persistence) ─────────────
+	let showBanner = $state(true);
+	$effect(() => {
+		if (initialBanner) showBanner = shouldShowBanner(initialBanner);
+	});
+	function handleDismiss() {
+		if (initialBanner) dismissBanner(initialBanner);
+		showBanner = false;
+	}
 
 	// ── API Calls ─────────────────────────────────────────────
 	async function saveSet(setId: string, status: 'completed' | 'skipped' | 'pending') {
@@ -175,14 +179,17 @@
 
 		setStates[setId] = { ...s, saving: true, status };
 
+		// Read fresh state after status update
+		const fresh = setStates[setId];
+
 		try {
 			const res = await fetch('/api/log-set', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					planned_set_id: setId,
-					actual_weight: s.weight ? parseFloat(s.weight) : null,
-					actual_reps: s.reps ? parseInt(s.reps, 10) : null,
+					actual_weight: fresh.weight ? parseFloat(fresh.weight) : null,
+					actual_reps: fresh.reps ? parseInt(fresh.reps, 10) : null,
 					status
 				})
 			});
@@ -200,10 +207,18 @@
 		}
 	}
 
-	function handleComplete(setId: string) {
+	function handleComplete(setId: string, exercise: FullPlanExercise) {
 		const s = setStates[setId];
 		if (!s) return;
-		saveSet(setId, s.status === 'completed' ? 'pending' : 'completed');
+		const newStatus = s.status === 'completed' ? 'pending' : 'completed';
+		// Auto-fill with target values if no weight/reps entered
+		if (newStatus === 'completed') {
+			const set = exercise.sets.find((set) => set.id === setId);
+			const weight = s.weight || (set?.target_weight != null ? String(set.target_weight) : '');
+			const reps = s.reps || (set?.target_reps != null ? String(set.target_reps) : '');
+			setStates[setId] = { ...s, weight, reps };
+		}
+		saveSet(setId, newStatus);
 	}
 
 	function handleSkip(setId: string) {
@@ -245,29 +260,19 @@
 	</header>
 
 	<!-- ═══ Banner ═══ -->
-	{#if initialBanner && !bannerDismissed}
-		<div class="banner slide-in">
-			{#if initialBanner === 'check-in'}
-				<a href="/check-in" class="banner-link">
-					<ClipboardCheck size={14} strokeWidth={2} />
-					<span class="banner-text">Time for your weekly check-in</span>
-					<ChevronRight size={13} strokeWidth={2} />
-				</a>
-			{:else}
-				<a href="/plan" class="banner-link banner-link-plan">
-					<Eye size={14} strokeWidth={2} />
-					<span class="banner-text">Review your new training plan</span>
-					<ChevronRight size={13} strokeWidth={2} />
-				</a>
-			{/if}
-			<button
-				class="banner-dismiss"
-				onclick={() => bannerDismissed = true}
-				title="Dismiss"
-			>
-				<X size={12} strokeWidth={2} />
-			</button>
-		</div>
+	{#if initialBanner && showBanner}
+		<Banner
+			type={initialBanner}
+			href={initialBanner === 'check-in' ? '/check-in' : '/plan'}
+			message={initialBanner === 'check-in' ? 'Time for your weekly check-in' : 'Review your new training plan'}
+			ondismiss={handleDismiss}
+		>
+			{#snippet icon()}
+				{#if initialBanner === 'plan-review'}
+					<Eye size={16} />
+				{/if}
+			{/snippet}
+		</Banner>
 	{/if}
 
 	{#if day.exercises.length === 0}
@@ -313,7 +318,7 @@
 				>
 					<!-- Exercise Header (tappable accordion) -->
 					<button class="card-header" onclick={() => expandedExercise = isExpanded ? null : exercise.id}>
-						<span class="card-num" class:card-num-done={exState === 'completed' && !hasPR} class:card-num-pr={exState === 'completed' && hasPR}>
+						<span class="card-num" class:card-num-done={exState === 'completed' && !hasPR} class:card-num-pr={exState === 'completed' && hasPR} class:card-num-upcoming={exState === 'upcoming'}>
 							{#if exState === 'completed'}
 								<Check size={13} strokeWidth={3} />
 							{:else}
@@ -321,13 +326,17 @@
 							{/if}
 						</span>
 						<div class="card-info">
-							<a
-								href="/exercise/{exercise.exercise_id.replace(/\s+/g, '-')}?name={encodeURIComponent(exercise.exercise_name)}"
-								class="card-name-link"
-								onclick={(e) => e.stopPropagation()}
-							>
+							{#if isExpanded}
+								<a
+									href="/exercise/{exercise.exercise_id.replace(/\s+/g, '-')}?name={encodeURIComponent(exercise.exercise_name)}"
+									class="card-name-link"
+									onclick={(e) => e.stopPropagation()}
+								>
+									<h3 class="card-name">{exercise.exercise_name}</h3>
+								</a>
+							{:else}
 								<h3 class="card-name">{exercise.exercise_name}</h3>
-							</a>
+							{/if}
 							{#if exState === 'completed' && hasPR}
 								<span class="card-pr-label">
 									<Trophy size={11} strokeWidth={2} />
@@ -391,51 +400,39 @@
 											<span>{set.set_number}</span>
 										</div>
 
-										{#if s.status === 'completed' && s.weight}
-											<div class="set-logged">
-												<span class="set-logged-val">
-													<span class="set-weight">{s.weight}</span>
-													<span class="set-unit">{unitPref}</span>
-													<span class="set-x">×</span>
-													<span class="set-reps">{s.reps}</span>
-												</span>
-												{#if setIsPR}
-													<span class="pr-badge">
-														<Trophy size={10} strokeWidth={2.5} />
-														PR
-													</span>
-												{/if}
-											</div>
-										{:else if s.status === 'skipped'}
-											<div class="set-logged">
-												<span class="set-logged-val set-struck">
-													<span class="set-weight">{set.target_weight ?? '—'}</span>
-													{#if set.target_weight != null}<span class="set-unit">{unitPref}</span>{/if}
-													<span class="set-x">×</span>
-													<span class="set-reps">{set.target_reps}</span>
-												</span>
-												<span class="skip-marker">Skipped</span>
-											</div>
-										{:else}
-											<div class="set-edit">
+										<div class="set-edit" class:set-struck={s.status === 'skipped'}>
+											<span class="set-input-wrap">
 												<input
 													type="number"
 													inputmode="decimal"
 													class="set-input"
 													placeholder={set.target_weight != null ? String(set.target_weight) : '—'}
 													bind:value={s.weight}
+													readonly={s.status !== 'pending'}
 												/>
-												<span class="set-unit-inline">{unitPref}</span>
-												<span class="set-edit-x">×</span>
+												<span class="set-input-unit">{unitPref}</span>
+											</span>
+											<span class="set-edit-x">×</span>
+											<span class="set-input-wrap">
 												<input
 													type="number"
 													inputmode="numeric"
 													class="set-input"
 													placeholder={String(set.target_reps)}
 													bind:value={s.reps}
+													readonly={s.status !== 'pending'}
 												/>
-											</div>
-										{/if}
+											</span>
+											{#if s.status === 'completed' && setIsPR}
+												<span class="pr-badge">
+													<Trophy size={10} strokeWidth={2.5} />
+													PR
+												</span>
+											{/if}
+											{#if s.status === 'skipped'}
+												<span class="skip-marker">Skipped</span>
+											{/if}
+										</div>
 
 										<!-- Action buttons -->
 										<div class="set-actions">
@@ -443,7 +440,7 @@
 												<button class="set-btn set-btn-skip-idle set-btn-disabled" disabled>
 													<X size={13} strokeWidth={2} />
 												</button>
-												<button class="set-btn set-btn-done" onclick={() => handleComplete(set.id)} disabled={s.saving} title="Undo">
+												<button class="set-btn set-btn-done" onclick={() => handleComplete(set.id, exercise)} disabled={s.saving} title="Undo">
 													<Check size={16} strokeWidth={3} />
 												</button>
 											{:else if s.status === 'skipped'}
@@ -457,7 +454,7 @@
 												<button class="set-btn set-btn-skip-idle" onclick={() => handleSkip(set.id)} disabled={s.saving} title="Skip set">
 													<X size={13} strokeWidth={2} />
 												</button>
-												<button class="set-btn set-btn-confirm" onclick={() => handleComplete(set.id)} disabled={s.saving} title="Done — log as prescribed">
+												<button class="set-btn set-btn-confirm" onclick={() => handleComplete(set.id, exercise)} disabled={s.saving} title="Done — log as prescribed">
 													<Check size={16} strokeWidth={2.5} />
 												</button>
 											{/if}
@@ -528,11 +525,6 @@
 		to { opacity: 1; transform: translateY(0); }
 	}
 
-	@keyframes slideIn {
-		from { opacity: 0; transform: translateY(-12px); }
-		to { opacity: 1; transform: translateY(0); }
-	}
-
 	@keyframes arcDraw {
 		from { stroke-dashoffset: 69; }
 	}
@@ -540,11 +532,6 @@
 	.push-up {
 		animation: pushUp 0.6s var(--ease-out) both;
 		animation-delay: calc(var(--d, 0) * 80ms + 100ms);
-	}
-
-	.slide-in {
-		animation: slideIn 0.4s var(--ease-out) both;
-		animation-delay: 200ms;
 	}
 
 	.arc-fill {
@@ -676,69 +663,6 @@
 		text-transform: capitalize;
 	}
 
-	/* ═══ Banner ═══ */
-	.banner {
-		display: flex;
-		align-items: center;
-		background: var(--color-reflect-muted);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-sm);
-		overflow: hidden;
-		box-shadow: 0 2px 10px rgba(167, 139, 250, 0.08);
-		transition: all var(--duration-normal) var(--ease-out);
-	}
-
-	.banner:hover {
-		background: rgba(167, 139, 250, 0.18);
-		box-shadow: 0 2px 14px rgba(167, 139, 250, 0.14);
-	}
-
-	.banner-link {
-		flex: 1;
-		display: flex;
-		align-items: center;
-		gap: var(--space-2);
-		padding: var(--space-3);
-		text-decoration: none;
-		color: var(--color-reflect);
-	}
-
-	.banner-link-plan {
-		color: var(--color-activity);
-	}
-
-	.banner-text {
-		flex: 1;
-		font-size: var(--text-sm);
-		font-weight: var(--weight-semibold);
-		color: var(--color-text);
-	}
-
-	.banner-link > :global(svg:last-of-type) {
-		color: var(--color-reflect);
-		flex-shrink: 0;
-	}
-
-	.banner-link-plan > :global(svg:last-of-type) {
-		color: var(--color-activity);
-	}
-
-	.banner-dismiss {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding: 0 var(--space-3);
-		background: none;
-		border: none;
-		color: var(--color-text-tertiary);
-		cursor: pointer;
-		transition: color var(--duration-fast);
-	}
-
-	.banner-dismiss:hover {
-		color: var(--color-text-secondary);
-	}
-
 	/* ═══ Rest State ═══ */
 	.rest-state {
 		text-align: center;
@@ -822,8 +746,7 @@
 	}
 
 	.card-active {
-		border-color: var(--color-activity);
-		box-shadow: var(--shadow-sm), 0 2px 16px rgba(45, 212, 168, 0.1);
+		box-shadow: var(--shadow-sm), 0 4px 16px rgba(45, 212, 168, 0.08);
 	}
 
 	.card-upcoming {
@@ -876,6 +799,11 @@
 	.card-num-pr {
 		color: var(--color-celebrate);
 		background: var(--color-celebrate-muted);
+	}
+
+	.card-num-upcoming {
+		color: var(--color-text-secondary);
+		background: var(--color-border);
 	}
 
 	.card-info {
@@ -989,7 +917,8 @@
 	}
 
 	.set-row.completed {
-		background: var(--color-activity-subtle);
+		background: var(--color-bg-raised);
+		opacity: 0.55;
 	}
 
 	.set-row.skipped {
@@ -1027,27 +956,18 @@
 		text-transform: uppercase;
 	}
 
-	/* ═══ Set Logged ═══ */
-	.set-logged {
-		flex: 1;
-		display: flex;
-		align-items: center;
-		gap: var(--space-2);
-	}
-
-	.set-logged-val {
-		font-family: var(--font-body);
-		font-size: var(--text-sm);
-		font-weight: var(--weight-medium);
-		color: var(--color-text-secondary);
-		display: inline-flex;
-		align-items: baseline;
-	}
-
-	.set-struck {
+	/* ═══ Set States ═══ */
+	.set-struck .set-input {
 		text-decoration: line-through;
 		text-decoration-color: var(--color-text-tertiary);
 		color: var(--color-text-tertiary);
+	}
+
+	.set-struck .set-input-unit,
+	.set-struck .set-edit-x {
+		color: var(--color-text-tertiary);
+		text-decoration: line-through;
+		text-decoration-color: var(--color-text-tertiary);
 	}
 
 	.skip-marker {
@@ -1063,48 +983,19 @@
 		letter-spacing: var(--tracking-wide);
 		line-height: 1;
 		text-transform: uppercase;
+		margin-left: var(--space-2);
 	}
 
-	/* ═══ Set Target (tappable) ═══ */
-	.set-target {
-		flex: 1;
-		background: none;
-		border: none;
-		color: var(--color-text);
-		font-family: var(--font-body);
-		font-size: var(--text-sm);
+	/* Completed: step back — done, not the focus */
+	.completed .set-input {
+		color: var(--color-text-secondary);
 		font-weight: var(--weight-medium);
-		text-align: left;
-		cursor: pointer;
-		padding: var(--space-1) 0;
-		border-radius: var(--radius-xs);
-		transition: color var(--duration-fast);
-		display: inline-flex;
-		align-items: baseline;
+		cursor: default;
 	}
 
-	.set-target:hover {
-		color: var(--color-activity);
-	}
-
-	.set-weight {
-		font-weight: var(--weight-semibold);
-	}
-
-	.set-unit {
-		font-size: var(--text-xs);
+	.completed .set-input-unit,
+	.completed .set-edit-x {
 		color: var(--color-text-tertiary);
-		font-weight: var(--weight-regular);
-		margin-left: var(--space-0-5);
-	}
-
-	.set-x {
-		color: var(--color-text-tertiary);
-		margin: 0 var(--space-2);
-	}
-
-	.set-reps {
-		font-weight: var(--weight-medium);
 	}
 
 	/* ═══ Set Edit Mode ═══ */
@@ -1115,39 +1006,56 @@
 		gap: var(--space-2);
 	}
 
-	.set-input {
-		width: 56px;
-		padding: var(--space-1-5) var(--space-2);
-		background: var(--color-bg);
-		border: 1.5px solid var(--color-border);
+	.set-input-wrap {
+		display: inline-flex;
+		align-items: baseline;
+		border: 1.5px solid transparent;
 		border-radius: var(--radius-sm);
+		padding: var(--space-1-5) var(--space-2);
+		transition: all var(--duration-fast);
+	}
+
+	.set-input-wrap:focus-within {
+		border-color: var(--color-activity);
+		background: var(--color-bg);
+	}
+
+	.set-input {
+		width: 2.5ch;
+		min-width: 1.5ch;
+		background: transparent;
+		border: none;
 		color: var(--color-text);
 		font-family: var(--font-mono);
 		font-size: var(--text-sm);
-		text-align: center;
+		font-weight: var(--weight-medium);
+		text-align: left;
 		outline: none;
-		transition: border-color var(--duration-fast);
 		-moz-appearance: textfield;
+		appearance: textfield;
 	}
 
-	.set-input:focus {
-		border-color: var(--color-activity);
+	.set-input::placeholder {
+		color: var(--color-text);
+		font-weight: var(--weight-medium);
 	}
 
 	.set-input::-webkit-outer-spin-button,
 	.set-input::-webkit-inner-spin-button {
 		-webkit-appearance: none;
+		appearance: none;
 	}
 
-	.set-unit-inline {
+	.set-input-unit {
 		font-size: var(--text-xs);
 		color: var(--color-text-tertiary);
-		margin-left: calc(-1 * var(--space-1));
+		font-weight: var(--weight-regular);
+		margin-left: var(--space-0-5);
 	}
 
 	.set-edit-x {
 		color: var(--color-text-tertiary);
-		font-size: var(--text-sm);
+		margin: 0 var(--space-2);
 	}
 
 	/* ═══ Set Action Buttons ═══ */

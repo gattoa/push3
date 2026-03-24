@@ -2,23 +2,27 @@
 	import type { UserSettings } from '$lib/types/database';
 
 	let { data, form } = $props();
-	const plan = data.plan;
-	const settings: UserSettings = data.settings;
-	const weekStats = data.weekStats;
+	const plan = $derived(data.plan);
+	const settings = $derived(data.settings as UserSettings);
+	const weekStats = $derived(data.weekStats);
 
-	// Pre-fill from current settings
+	// Pre-fill from current settings (initial snapshot — these become user-editable)
 	let bodyWeight = $state('');
-	let injuries = $state(settings.injuries.join(', '));
-	let equipment = $state(settings.equipment.join(', '));
+	let injuries = $state('');
+	let equipment = $state('');
+	$effect(() => {
+		injuries = settings.injuries.join(', ');
+		equipment = settings.equipment.join(', ');
+	});
 	let injuryChanges = $state('');
 	let equipmentChanges = $state('');
 	let notes = $state('');
 
 	let submitting = $state(false);
 
-	const completionRate = weekStats.totalSets > 0
+	const completionRate = $derived(weekStats.totalSets > 0
 		? Math.round((weekStats.completedSets / weekStats.totalSets) * 100)
-		: 0;
+		: 0);
 </script>
 
 <svelte:head>
@@ -81,9 +85,10 @@
 
 		<!-- Injuries -->
 		<div class="form-section">
-			<label class="form-label">Current Injuries</label>
+			<label class="form-label" for="injuries_input">Current Injuries</label>
 			<p class="form-hint">Update if anything has changed. Comma-separated.</p>
 			<input
+				id="injuries_input"
 				type="text"
 				placeholder={settings.injuries.length > 0 ? settings.injuries.join(', ') : 'None'}
 				bind:value={injuries}
@@ -103,9 +108,10 @@
 
 		<!-- Equipment -->
 		<div class="form-section">
-			<label class="form-label">Available Equipment</label>
+			<label class="form-label" for="equipment_input">Available Equipment</label>
 			<p class="form-hint">Update if your equipment access has changed. Comma-separated.</p>
 			<input
+				id="equipment_input"
 				type="text"
 				placeholder={settings.equipment.join(', ')}
 				bind:value={equipment}
@@ -301,11 +307,13 @@
 	.form-input[type="number"]::-webkit-outer-spin-button,
 	.form-input[type="number"]::-webkit-inner-spin-button {
 		-webkit-appearance: none;
+		appearance: none;
 		margin: 0;
 	}
 
 	.form-input[type="number"] {
 		-moz-appearance: textfield;
+		appearance: textfield;
 	}
 
 	/* Submit */

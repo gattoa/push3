@@ -57,6 +57,8 @@
 	let showMenu = $state(false);
 	const avatarUrl: string | null = null;
 	const initials = 'AG';
+	const user = { user_metadata: { full_name: 'Andrew Gatto' }, email: 'ag@example.com' };
+	function signOut() { showMenu = false; }
 
 	// ── Set State ──────────────────────────────────────────────
 	let setStates = $state<Record<string, {
@@ -217,7 +219,7 @@
 <div class="page">
 	<!-- ═══ Header ═══ -->
 	<header class="header push-up" style="--d:0">
-		<a href="#" class="header-icon" title="Weekly agenda">
+		<a href="/" class="header-icon" title="Weekly agenda">
 			<Menu size={20} strokeWidth={2} />
 		</a>
 		<div class="header-center">
@@ -245,13 +247,13 @@
 	{#if initialBanner && !bannerDismissed}
 		<div class="banner slide-in">
 			{#if initialBanner === 'check-in'}
-				<a href="#" class="banner-link">
+				<a href="/" class="banner-link">
 					<ClipboardCheck size={14} strokeWidth={2} />
 					<span class="banner-text">Time for your weekly check-in</span>
 					<ChevronRight size={13} strokeWidth={2} />
 				</a>
 			{:else}
-				<a href="#" class="banner-link banner-link-plan">
+				<a href="/" class="banner-link banner-link-plan">
 					<Eye size={14} strokeWidth={2} />
 					<span class="banner-text">Review your new training plan</span>
 					<ChevronRight size={13} strokeWidth={2} />
@@ -270,7 +272,7 @@
 	{#if day.exercises.length === 0}
 		<div class="rest-state push-up" style="--d:1">
 			<p>Rest day. Recover and prepare for your next session.</p>
-			<a href="#" class="btn btn-secondary">View Weekly Plan</a>
+			<a href="/" class="btn btn-secondary">View Weekly Plan</a>
 		</div>
 	{:else}
 		<!-- ═══ Progress Bar (segmented) ═══ -->
@@ -310,7 +312,7 @@
 				>
 					<!-- Exercise Header (tappable accordion) -->
 					<button class="card-header" onclick={() => expandedExercise = isExpanded ? null : exercise.id}>
-						<span class="card-num" class:card-num-done={exState === 'completed' && !hasPR} class:card-num-pr={exState === 'completed' && hasPR}>
+						<span class="card-num" class:card-num-done={exState === 'completed' && !hasPR} class:card-num-pr={exState === 'completed' && hasPR} class:card-num-upcoming={exState === 'upcoming'}>
 							{#if exState === 'completed'}
 								<Check size={13} strokeWidth={3} />
 							{:else}
@@ -318,13 +320,17 @@
 							{/if}
 						</span>
 						<div class="card-info">
-							<a
-								href="/exercise/{exercise.exercise_id.replace(/\s+/g, '-')}?name={encodeURIComponent(exercise.exercise_name)}"
-								class="card-name-link"
-								onclick={(e) => e.stopPropagation()}
-							>
+							{#if isExpanded}
+								<a
+									href="/exercise/{exercise.exercise_id.replace(/\s+/g, '-')}?name={encodeURIComponent(exercise.exercise_name)}"
+									class="card-name-link"
+									onclick={(e) => e.stopPropagation()}
+								>
+									<h3 class="card-name">{exercise.exercise_name}</h3>
+								</a>
+							{:else}
 								<h3 class="card-name">{exercise.exercise_name}</h3>
-							</a>
+							{/if}
 							{#if exState === 'completed' && hasPR}
 								<span class="card-pr-label">
 									<Trophy size={11} strokeWidth={2} />
@@ -388,51 +394,39 @@
 											<span>{set.set_number}</span>
 										</div>
 
-										{#if s.status === 'completed' && s.weight}
-											<div class="set-logged">
-												<span class="set-logged-val">
-													<span class="set-weight">{s.weight}</span>
-													<span class="set-unit">{unitPref}</span>
-													<span class="set-x">×</span>
-													<span class="set-reps">{s.reps}</span>
-												</span>
-												{#if setIsPR}
-													<span class="pr-badge">
-														<Trophy size={10} strokeWidth={2.5} />
-														PR
-													</span>
-												{/if}
-											</div>
-										{:else if s.status === 'skipped'}
-											<div class="set-logged">
-												<span class="set-logged-val set-struck">
-													<span class="set-weight">{set.target_weight ?? '—'}</span>
-													{#if set.target_weight != null}<span class="set-unit">{unitPref}</span>{/if}
-													<span class="set-x">×</span>
-													<span class="set-reps">{set.target_reps}</span>
-												</span>
-												<span class="skip-marker">Skipped</span>
-											</div>
-										{:else}
-											<div class="set-edit">
+										<div class="set-edit" class:set-struck={s.status === 'skipped'}>
+											<span class="set-input-wrap">
 												<input
 													type="number"
 													inputmode="decimal"
 													class="set-input"
 													placeholder={set.target_weight != null ? String(set.target_weight) : '—'}
 													bind:value={s.weight}
+													readonly={s.status !== 'pending'}
 												/>
-												<span class="set-unit-inline">{unitPref}</span>
-												<span class="set-edit-x">×</span>
+												<span class="set-input-unit">{unitPref}</span>
+											</span>
+											<span class="set-edit-x">×</span>
+											<span class="set-input-wrap">
 												<input
 													type="number"
 													inputmode="numeric"
 													class="set-input"
 													placeholder={String(set.target_reps)}
 													bind:value={s.reps}
+													readonly={s.status !== 'pending'}
 												/>
-											</div>
-										{/if}
+											</span>
+											{#if s.status === 'completed' && setIsPR}
+												<span class="pr-badge">
+													<Trophy size={10} strokeWidth={2.5} />
+													PR
+												</span>
+											{/if}
+											{#if s.status === 'skipped'}
+												<span class="skip-marker">Skipped</span>
+											{/if}
+										</div>
 
 										<!-- Action buttons -->
 										<div class="set-actions">
@@ -512,7 +506,7 @@
 						</div>
 					{/if}
 				</div>
-				<a href="#" class="btn btn-secondary summary-cta">View Weekly Plan</a>
+				<a href="/" class="btn btn-secondary summary-cta">View Weekly Plan</a>
 			</div>
 		{/if}
 	{/if}
@@ -819,8 +813,7 @@
 	}
 
 	.card-active {
-		border-color: var(--color-activity);
-		box-shadow: var(--shadow-sm), 0 2px 16px rgba(45, 212, 168, 0.1);
+		box-shadow: var(--shadow-sm), 0 4px 16px rgba(45, 212, 168, 0.08);
 	}
 
 	.card-upcoming {
@@ -873,6 +866,11 @@
 	.card-num-pr {
 		color: var(--color-celebrate);
 		background: var(--color-celebrate-muted);
+	}
+
+	.card-num-upcoming {
+		color: var(--color-text-secondary);
+		background: var(--color-border);
 	}
 
 	.card-info {
@@ -986,7 +984,8 @@
 	}
 
 	.set-row.completed {
-		background: var(--color-activity-subtle);
+		background: var(--color-bg-raised);
+		opacity: 0.55;
 	}
 
 	.set-row.skipped {
@@ -1024,27 +1023,18 @@
 		text-transform: uppercase;
 	}
 
-	/* ═══ Set Logged ═══ */
-	.set-logged {
-		flex: 1;
-		display: flex;
-		align-items: center;
-		gap: var(--space-2);
-	}
-
-	.set-logged-val {
-		font-family: var(--font-body);
-		font-size: var(--text-sm);
-		font-weight: var(--weight-medium);
-		color: var(--color-text-secondary);
-		display: inline-flex;
-		align-items: baseline;
-	}
-
-	.set-struck {
+	/* ═══ Set States ═══ */
+	.set-struck .set-input {
 		text-decoration: line-through;
 		text-decoration-color: var(--color-text-tertiary);
 		color: var(--color-text-tertiary);
+	}
+
+	.set-struck .set-input-unit,
+	.set-struck .set-edit-x {
+		color: var(--color-text-tertiary);
+		text-decoration: line-through;
+		text-decoration-color: var(--color-text-tertiary);
 	}
 
 	.skip-marker {
@@ -1060,48 +1050,19 @@
 		letter-spacing: var(--tracking-wide);
 		line-height: 1;
 		text-transform: uppercase;
+		margin-left: var(--space-2);
 	}
 
-	/* ═══ Set Target (tappable) ═══ */
-	.set-target {
-		flex: 1;
-		background: none;
-		border: none;
-		color: var(--color-text);
-		font-family: var(--font-body);
-		font-size: var(--text-sm);
+	/* Completed: step back — done, not the focus */
+	.completed .set-input {
+		color: var(--color-text-secondary);
 		font-weight: var(--weight-medium);
-		text-align: left;
-		cursor: pointer;
-		padding: var(--space-1) 0;
-		border-radius: var(--radius-xs);
-		transition: color var(--duration-fast);
-		display: inline-flex;
-		align-items: baseline;
+		cursor: default;
 	}
 
-	.set-target:hover {
-		color: var(--color-activity);
-	}
-
-	.set-weight {
-		font-weight: var(--weight-semibold);
-	}
-
-	.set-unit {
-		font-size: var(--text-xs);
+	.completed .set-input-unit,
+	.completed .set-edit-x {
 		color: var(--color-text-tertiary);
-		font-weight: var(--weight-regular);
-		margin-left: var(--space-0-5);
-	}
-
-	.set-x {
-		color: var(--color-text-tertiary);
-		margin: 0 var(--space-2);
-	}
-
-	.set-reps {
-		font-weight: var(--weight-medium);
 	}
 
 	/* ═══ Set Edit Mode ═══ */
@@ -1112,39 +1073,56 @@
 		gap: var(--space-2);
 	}
 
-	.set-input {
-		width: 56px;
-		padding: var(--space-1-5) var(--space-2);
-		background: var(--color-bg);
-		border: 1.5px solid var(--color-border);
+	.set-input-wrap {
+		display: inline-flex;
+		align-items: baseline;
+		border: 1.5px solid transparent;
 		border-radius: var(--radius-sm);
+		padding: var(--space-1-5) var(--space-2);
+		transition: all var(--duration-fast);
+	}
+
+	.set-input-wrap:focus-within {
+		border-color: var(--color-activity);
+		background: var(--color-bg);
+	}
+
+	.set-input {
+		width: 2.5ch;
+		min-width: 1.5ch;
+		background: transparent;
+		border: none;
 		color: var(--color-text);
 		font-family: var(--font-mono);
 		font-size: var(--text-sm);
-		text-align: center;
+		font-weight: var(--weight-medium);
+		text-align: left;
 		outline: none;
-		transition: border-color var(--duration-fast);
 		-moz-appearance: textfield;
+		appearance: textfield;
 	}
 
-	.set-input:focus {
-		border-color: var(--color-activity);
+	.set-input::placeholder {
+		color: var(--color-text);
+		font-weight: var(--weight-medium);
 	}
 
 	.set-input::-webkit-outer-spin-button,
 	.set-input::-webkit-inner-spin-button {
 		-webkit-appearance: none;
+		appearance: none;
 	}
 
-	.set-unit-inline {
+	.set-input-unit {
 		font-size: var(--text-xs);
 		color: var(--color-text-tertiary);
-		margin-left: calc(-1 * var(--space-1));
+		font-weight: var(--weight-regular);
+		margin-left: var(--space-0-5);
 	}
 
 	.set-edit-x {
 		color: var(--color-text-tertiary);
-		font-size: var(--text-sm);
+		margin: 0 var(--space-2);
 	}
 
 	/* ═══ Set Action Buttons ═══ */

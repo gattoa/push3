@@ -459,17 +459,17 @@
 			<h3 class="el-label">Inputs</h3>
 			<div class="el-inputs">
 				<div class="input-col">
-					<label class="input-lbl">Weight</label>
-					<input class="input-field" type="number" value="145" />
+					<label class="input-lbl" for="ds-weight">Weight</label>
+					<input id="ds-weight" class="input-field" type="number" value="145" />
 				</div>
 				<div class="input-col">
-					<label class="input-lbl">Reps</label>
-					<input class="input-field" type="number" value="10" />
+					<label class="input-lbl" for="ds-reps">Reps</label>
+					<input id="ds-reps" class="input-field" type="number" value="10" />
 				</div>
 			</div>
 			<div class="input-col input-wide">
-				<label class="input-lbl">Notes</label>
-				<textarea class="input-area" rows="2" placeholder="Felt strong today."></textarea>
+				<label class="input-lbl" for="ds-notes">Notes</label>
+				<textarea id="ds-notes" class="input-area" rows="2" placeholder="Felt strong today."></textarea>
 			</div>
 		</div>
 

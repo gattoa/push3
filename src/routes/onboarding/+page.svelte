@@ -141,8 +141,8 @@
 				</div>
 
 				<div class="field-group">
-					<label class="field-label">Gender</label>
-					<div class="chip-grid compact">
+					<span class="field-label" id="gender-label">Gender</span>
+					<div class="chip-grid compact" role="group" aria-labelledby="gender-label">
 						{#each genderOptions as opt}
 							<button
 								type="button"
@@ -252,8 +252,8 @@
 				<p class="step-desc">How many days per week and how long per session?</p>
 
 				<div class="schedule-group">
-					<label class="field-label">Days per week</label>
-					<div class="chip-grid compact">
+					<span class="field-label" id="days-label">Days per week</span>
+					<div class="chip-grid compact" role="group" aria-labelledby="days-label">
 						{#each [2, 3, 4, 5, 6] as d}
 							<button
 								type="button"
@@ -268,8 +268,8 @@
 				</div>
 
 				<div class="schedule-group">
-					<label class="field-label">Session duration (minutes)</label>
-					<div class="chip-grid compact">
+					<span class="field-label" id="duration-label">Session duration (minutes)</span>
+					<div class="chip-grid compact" role="group" aria-labelledby="duration-label">
 						{#each durationOptions as dur}
 							<button
 								type="button"
@@ -310,8 +310,9 @@
 
 				{#if hasInjuries}
 					<div class="injury-expand">
-						<label class="field-label">Describe your injuries</label>
+						<label class="field-label" for="injury-desc">Describe your injuries</label>
 						<textarea
+							id="injury-desc"
 							class="injury-input"
 							placeholder="e.g. left shoulder, lower back"
 							bind:value={injuries}

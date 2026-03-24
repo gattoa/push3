@@ -1,6 +1,6 @@
 import { redirect, error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { getFullPlan } from '$lib/server/supabase';
+import { getFullPlan, getExerciseHistory } from '$lib/server/supabase';
 
 export const load: PageServerLoad = async ({ params, locals: { safeGetSession, supabase } }) => {
 	const { user } = await safeGetSession();
@@ -21,16 +21,29 @@ export const load: PageServerLoad = async ({ params, locals: { safeGetSession, s
 		error(404, 'Day not found in current plan.');
 	}
 
-	// Get user's unit preference for display
-	const { data: settings } = await supabase
-		.from('user_settings')
-		.select('unit_pref')
-		.eq('user_id', user.id)
-		.single();
+	// Fetch unit preference + exercise history in parallel
+	const exerciseIds = day.exercises.map((e) => e.exercise_id);
+	const [{ data: settings }, historyMap] = await Promise.all([
+		supabase.from('user_settings').select('unit_pref').eq('user_id', user.id).single(),
+		getExerciseHistory(supabase, user.id, exerciseIds)
+	]);
+
+	// Transform snake_case RPC result to camelCase for component consistency
+	const exerciseHistory: Record<string, { lastWeight: number; lastReps: number; bestE1RM: number }> = {};
+	for (const [exId, hist] of Object.entries(historyMap)) {
+		if (hist.last_weight != null && hist.last_reps != null && hist.best_e1rm != null) {
+			exerciseHistory[exId] = {
+				lastWeight: hist.last_weight,
+				lastReps: hist.last_reps,
+				bestE1RM: hist.best_e1rm
+			};
+		}
+	}
 
 	return {
 		plan: fullPlan.plan,
 		day,
-		unitPref: settings?.unit_pref ?? 'lb'
+		unitPref: settings?.unit_pref ?? 'lb',
+		exerciseHistory
 	};
 };
