@@ -1,44 +1,9 @@
+@import './styles/tokens.css';
+@import './styles/reset.css';
+
+/* Backwards-compatibility aliases (remove after full migration) */
 :root {
-	--color-bg: #0a0a0a;
-	--color-surface: #141414;
-	--color-surface-hover: #1a1a1a;
-	--color-border: #262626;
-	--color-text: #fafafa;
-	--color-text-muted: #a1a1aa;
-	--color-accent: #22c55e;
-	--color-accent-hover: #16a34a;
-
-	--font-display: 'JetBrains Mono', monospace;
-	--font-body: 'Inter', sans-serif;
-
-	--radius: 12px;
-	--radius-sm: 8px;
-
-	/* Safe area insets for PWA standalone mode (iPhone notch/dynamic island) */
-	--safe-top: env(safe-area-inset-top, 0px);
-	--safe-bottom: env(safe-area-inset-bottom, 0px);
-	--safe-left: env(safe-area-inset-left, 0px);
-	--safe-right: env(safe-area-inset-right, 0px);
-}
-
-*,
-*::before,
-*::after {
-	box-sizing: border-box;
-	margin: 0;
-	padding: 0;
-}
-
-html,
-body {
-	height: 100%;
-	font-family: var(--font-body);
-	background: var(--color-bg);
-	color: var(--color-text);
-	-webkit-font-smoothing: antialiased;
-	-moz-osx-font-smoothing: grayscale;
-}
-
-body {
-	line-height: 1.5;
+	--color-accent: var(--color-activity);
+	--color-accent-hover: var(--color-activity-hover);
+	--color-text-muted: var(--color-text-secondary);
 }
