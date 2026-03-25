@@ -205,7 +205,7 @@
 				didSwipe = true;
 				// Fetch fallback alternatives if plan data doesn't have them
 				const exercise = day.exercises.find((e) => e.id === swipingId);
-				if (exercise && !exercise.alternatives && !alternativesCache[exercise.id]) {
+				if (exercise && (!exercise.alternatives || exercise.alternatives.length === 0) && !alternativesCache[exercise.id]) {
 					fetchFallbackAlternatives(exercise);
 				}
 			} else if (dx > SWIPE_THRESHOLD && flippedId === swipingId) {
