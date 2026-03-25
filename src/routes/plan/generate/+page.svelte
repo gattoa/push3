@@ -2,8 +2,24 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 
-	let status = $state<'generating' | 'error'>('generating');
+	let status = $state<'generating' | 'error' | 'recovered'>('generating');
 	let errorMessage = $state('');
+
+	async function checkForExistingPlan(): Promise<boolean> {
+		try {
+			const res = await fetch('/api/generate-plan');
+			const data = await res.json();
+			if (data.plan) {
+				status = 'recovered';
+				// Brief pause so user sees recovery message
+				setTimeout(() => goto('/plan'), 1200);
+				return true;
+			}
+		} catch {
+			// Check failed — not critical
+		}
+		return false;
+	}
 
 	onMount(async () => {
 		try {
@@ -11,6 +27,11 @@
 			const data = await res.json();
 
 			if (!res.ok || data.error) {
+				// If 409 (plan already exists), just redirect
+				if (res.status === 409) {
+					goto('/plan');
+					return;
+				}
 				status = 'error';
 				errorMessage = data.error || 'Generation failed.';
 				return;
@@ -18,8 +39,13 @@
 
 			goto('/plan');
 		} catch (e) {
-			status = 'error';
-			errorMessage = e instanceof Error ? e.message : 'An unexpected error occurred.';
+			// Client-side error (likely timeout/phone sleep)
+			// Check if the plan was saved despite the client disconnect
+			const recovered = await checkForExistingPlan();
+			if (!recovered) {
+				status = 'error';
+				errorMessage = e instanceof Error ? e.message : 'An unexpected error occurred.';
+			}
 		}
 	});
 
@@ -41,6 +67,12 @@
 			<div class="pulse-ring"></div>
 			<h2>Building your plan...</h2>
 			<p class="subtitle">This takes 10-20 seconds. Your AI coach is analyzing your profile and selecting exercises.</p>
+		</div>
+	{:else if status === 'recovered'}
+		<div class="loading">
+			<div class="check-icon">✓</div>
+			<h2>Your plan is ready!</h2>
+			<p class="subtitle">Redirecting you now...</p>
 		</div>
 	{:else}
 		<div class="error-state">
@@ -85,6 +117,20 @@
 		border-radius: 50%;
 		border: 3px solid var(--color-accent);
 		animation: pulse 1.5s ease-in-out infinite;
+		margin: 0 auto 1.5rem;
+	}
+
+	.check-icon {
+		width: 48px;
+		height: 48px;
+		border-radius: 50%;
+		background: var(--color-accent);
+		color: #0a0a0a;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 1.5rem;
+		font-weight: 700;
 		margin: 0 auto 1.5rem;
 	}
 
