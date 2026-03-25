@@ -8,7 +8,8 @@
 	import { shouldShowBanner, dismissBanner } from '$lib/utils/banner';
 	import Banner from '$lib/components/Banner.svelte';
 	import { page } from '$app/state';
-	import { goto } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
+	import type { ExerciseAlternative } from '$lib/types/database';
 
 	let { data } = $props();
 	const day = $derived(data.day as FullPlanDay);
@@ -202,6 +203,11 @@
 			if (dx < -SWIPE_THRESHOLD && !flippedId) {
 				flippedId = swipingId;
 				didSwipe = true;
+				// Fetch fallback alternatives if plan data doesn't have them
+				const exercise = day.exercises.find((e) => e.id === swipingId);
+				if (exercise && !exercise.alternatives && !alternativesCache[exercise.id]) {
+					fetchFallbackAlternatives(exercise);
+				}
 			} else if (dx > SWIPE_THRESHOLD && flippedId === swipingId) {
 				flippedId = null;
 				didSwipe = true;
@@ -216,29 +222,58 @@
 		expandedExercise = isExpanded ? null : exerciseId;
 	}
 
-	const MOCK_ALTERNATIVES: Record<string, { exercise_id: string; exercise_name: string; target: string; equipment: string }[]> = {};
-	function getMockAlternatives(exercise: FullPlanExercise) {
-		if (MOCK_ALTERNATIVES[exercise.id]) return MOCK_ALTERNATIVES[exercise.id];
-		const alts = [
-			{ exercise_id: 'alt-1', exercise_name: 'Romanian Deadlift', target: 'hamstrings', equipment: 'barbell' },
-			{ exercise_id: 'alt-2', exercise_name: 'Sumo Deadlift', target: 'glutes', equipment: 'barbell' },
-			{ exercise_id: 'alt-3', exercise_name: 'Good Morning', target: 'hamstrings', equipment: 'barbell' }
-		];
-		MOCK_ALTERNATIVES[exercise.id] = alts;
-		return alts;
+	// ── Swap Alternatives ─────────────────────────────────────
+	let alternativesCache = $state<Record<string, ExerciseAlternative[]>>({});
+	let loadingAlternatives = $state<Record<string, boolean>>({});
+	let swappingId = $state<string | null>(null);
+
+	function getAlternatives(exercise: FullPlanExercise): ExerciseAlternative[] | null {
+		if (exercise.alternatives && exercise.alternatives.length > 0) return exercise.alternatives;
+		if (alternativesCache[exercise.id]) return alternativesCache[exercise.id];
+		return null;
 	}
 
-	function getMockRationale(_exercise: FullPlanExercise): string {
-		return 'Builds foundational hip hinge strength for your lower body day.';
+	async function fetchFallbackAlternatives(exercise: FullPlanExercise) {
+		if (loadingAlternatives[exercise.id]) return;
+		loadingAlternatives[exercise.id] = true;
+		try {
+			const res = await fetch(`/api/swap-alternatives?exercise_id=${encodeURIComponent(exercise.exercise_id)}`);
+			if (res.ok) {
+				const { alternatives } = await res.json();
+				alternativesCache[exercise.id] = alternatives;
+			}
+		} finally {
+			loadingAlternatives[exercise.id] = false;
+		}
 	}
 
 	function hasPendingSets(exercise: FullPlanExercise): boolean {
 		return exercise.sets.some((s) => setStates[s.id]?.status === 'pending');
 	}
 
-	function handleSwapSelect(exerciseId: string, altName: string) {
-		console.log('[swap] Replace exercise', exerciseId, 'with', altName);
-		flippedId = null;
+	async function handleSwapSelect(exerciseId: string, alt: ExerciseAlternative) {
+		if (swappingId) return;
+		swappingId = exerciseId;
+		try {
+			const res = await fetch('/api/swap-exercise', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					planned_exercise_id: exerciseId,
+					new_exercise_id: alt.exercise_id,
+					new_exercise_name: alt.exercise_name
+				})
+			});
+			if (res.ok) {
+				flippedId = null;
+				await invalidateAll();
+			} else {
+				const { error } = await res.json();
+				console.error('[swap] Failed:', error);
+			}
+		} finally {
+			swappingId = null;
+		}
 	}
 
 	// ── Banner (localStorage-backed persistence) ─────────────
@@ -468,9 +503,9 @@
 							</span>
 						</div>
 
-						{#if isExpanded}
+						{#if isExpanded && exercise.rationale}
 							<p class="card-rationale">
-								{getMockRationale(exercise)}
+								{exercise.rationale}
 							</p>
 						{/if}
 
@@ -565,16 +600,22 @@
 						<div class="flip-back-header">
 							<ArrowLeftRight size={14} strokeWidth={2} />
 							<span>Swap {exercise.exercise_name}</span>
-							<button class="flip-back-close" onclick={() => flippedId = null} title="Cancel">
+							<button class="flip-back-close" onpointerdown={(e) => e.stopPropagation()} onclick={() => flippedId = null} title="Cancel">
 								<X size={14} strokeWidth={2} />
 							</button>
 						</div>
-						{#each getMockAlternatives(exercise) as alt}
-							<button class="swap-alt" onclick={() => handleSwapSelect(exercise.id, alt.exercise_name)}>
-								<span class="swap-alt-name">{alt.exercise_name}</span>
-								<span class="swap-alt-meta">{alt.equipment}</span>
-							</button>
-						{/each}
+						{#if loadingAlternatives[exercise.id]}
+							<div class="swap-loading">Loading alternatives…</div>
+						{:else if getAlternatives(exercise)?.length}
+							{#each getAlternatives(exercise) ?? [] as alt}
+								<button class="swap-alt" onpointerdown={(e) => e.stopPropagation()} onclick={() => handleSwapSelect(exercise.id, alt)} disabled={swappingId === exercise.id}>
+									<span class="swap-alt-name">{alt.exercise_name}</span>
+									<span class="swap-alt-meta">{alt.equipment}</span>
+								</button>
+							{/each}
+						{:else}
+							<div class="swap-empty">No alternatives available</div>
+						{/if}
 					</div>
 				</div>
 			{/each}
@@ -1100,6 +1141,18 @@
 		color: var(--color-text-tertiary);
 	}
 
+	.swap-alt:disabled {
+		opacity: 0.5;
+		pointer-events: none;
+	}
+
+	.swap-loading,
+	.swap-empty {
+		padding: var(--space-3);
+		text-align: center;
+		color: var(--color-text-tertiary);
+		font-size: var(--text-sm);
+	}
 
 	/* Per-exercise arc gauge */
 	.card-arc-wrap {
