@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 
+	let { form } = $props();
+
 	let step = $state(1);
 	const totalSteps = 6;
 
@@ -15,6 +17,7 @@
 	let hasInjuries = $state<boolean | null>(null);
 	let injuries = $state('');
 	let submitting = $state(false);
+	let errorMessage = $state('');
 
 	const genderOptions = [
 		{ value: 'male', label: 'Male' },
@@ -104,9 +107,15 @@
 		method="POST"
 		use:enhance={() => {
 			submitting = true;
-			return async ({ update }) => {
-				await update();
-				submitting = false;
+			errorMessage = '';
+			return async ({ result, update }) => {
+				if (result.type === 'failure') {
+					errorMessage = result.data?.message || 'Something went wrong. Please try again.';
+					submitting = false;
+				} else {
+					await update();
+					submitting = false;
+				}
 			};
 		}}
 	>
@@ -322,6 +331,10 @@
 				{/if}
 			{/if}
 		</div>
+
+		{#if errorMessage}
+			<div class="error-banner" role="alert">{errorMessage}</div>
+		{/if}
 
 		<!-- Navigation -->
 		<div class="nav-buttons">
@@ -661,5 +674,16 @@
 
 	@keyframes spin {
 		to { transform: rotate(360deg); }
+	}
+
+	.error-banner {
+		background: rgba(239, 68, 68, 0.1);
+		border: 1px solid rgba(239, 68, 68, 0.3);
+		color: #ef4444;
+		padding: 0.75rem 1rem;
+		border-radius: var(--radius-sm);
+		font-size: 0.85rem;
+		line-height: 1.4;
+		margin-top: 1rem;
 	}
 </style>

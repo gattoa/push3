@@ -8,6 +8,26 @@ export const POST: RequestHandler = async ({ locals: { safeGetSession, supabase 
 		return json({ error: 'Not authenticated' }, { status: 401 });
 	}
 
+	// Rate limit: reject if a plan was created within the last 60 seconds
+	const { data: recentPlan } = await supabase
+		.from('weekly_plans')
+		.select('created_at')
+		.eq('user_id', user.id)
+		.order('created_at', { ascending: false })
+		.limit(1)
+		.maybeSingle();
+
+	if (recentPlan) {
+		const elapsed = Date.now() - new Date(recentPlan.created_at).getTime();
+		if (elapsed < 60_000) {
+			const waitSeconds = Math.ceil((60_000 - elapsed) / 1000);
+			return json(
+				{ error: `Please wait ${waitSeconds} seconds before generating another plan.` },
+				{ status: 429 }
+			);
+		}
+	}
+
 	try {
 		const result = await generatePlan(supabase, user.id);
 

@@ -39,6 +39,14 @@ export interface PlannedDay {
 	created_at: string;
 }
 
+export interface ExerciseAlternative {
+	exercise_id: string;
+	exercise_name: string;
+	body_part: string;
+	target: string;
+	equipment: string;
+}
+
 export interface PlannedExercise {
 	id: string;
 	day_id: string;
@@ -46,6 +54,8 @@ export interface PlannedExercise {
 	exercise_name: string;
 	order_index: number;
 	notes: string | null;
+	alternatives: ExerciseAlternative[] | null;
+	rationale: string | null;
 	created_at: string;
 }
 
@@ -127,6 +137,8 @@ export interface PlannedExerciseInsert {
 	exercise_name: string;
 	order_index: number;
 	notes?: string | null;
+	alternatives?: ExerciseAlternative[] | null;
+	rationale?: string | null;
 }
 
 export interface PlannedSetInsert {
@@ -183,6 +195,8 @@ export interface FullPlanExercise {
 	exercise_name: string;
 	order_index: number;
 	notes: string | null;
+	alternatives: ExerciseAlternative[] | null;
+	rationale: string | null;
 	sets: FullPlanSet[];
 }
 

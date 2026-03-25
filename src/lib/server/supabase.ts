@@ -47,13 +47,15 @@ export async function updateUserSettings(
 ): Promise<UserSettings | null> {
 	const { data, error } = await supabase
 		.from('user_settings')
-		.update({ ...updates, updated_at: new Date().toISOString() })
-		.eq('user_id', userId)
+		.upsert(
+			{ user_id: userId, ...updates, updated_at: new Date().toISOString() },
+			{ onConflict: 'user_id' }
+		)
 		.select()
 		.single();
 
 	if (error) {
-		console.error('Failed to update user settings:', error.message);
+		console.error('Failed to upsert user settings:', error.message, '| code:', error.code, '| details:', error.details, '| hint:', error.hint);
 		return null;
 	}
 	return data;
@@ -166,7 +168,9 @@ export async function savePlan(
 					exercise_id: exercise.exercise_id,
 					exercise_name: exercise.exercise_name,
 					order_index: exercise.order_index,
-					notes: exercise.notes ?? null
+					notes: exercise.notes ?? null,
+					alternatives: exercise.alternatives ?? null,
+					rationale: exercise.rationale ?? null
 				})
 				.select('id')
 				.single();
@@ -257,4 +261,83 @@ export async function createCheckIn(
 		return null;
 	}
 	return data.id;
+}
+
+// ============================================================================
+// Exercise Swaps
+// ============================================================================
+
+export async function swapExercise(
+	supabase: SupabaseClient,
+	plannedExerciseId: string,
+	newExerciseId: string,
+	newExerciseName: string
+): Promise<{ success: true } | { success: false; error: string }> {
+	// 1. Get planned_sets IDs for this exercise
+	const { data: sets, error: setsQueryError } = await supabase
+		.from('planned_sets')
+		.select('id')
+		.eq('planned_exercise_id', plannedExerciseId);
+
+	if (setsQueryError) {
+		console.error('Failed to query planned sets:', setsQueryError.message);
+		return { success: false, error: setsQueryError.message };
+	}
+
+	const setIds = (sets ?? []).map((s) => s.id);
+
+	// 2. Delete set_logs for those planned_sets
+	if (setIds.length > 0) {
+		const { error: logsDeleteError } = await supabase
+			.from('set_logs')
+			.delete()
+			.in('planned_set_id', setIds);
+
+		if (logsDeleteError) {
+			console.error('Failed to delete set logs:', logsDeleteError.message);
+			return { success: false, error: logsDeleteError.message };
+		}
+	}
+
+	// 3. Delete planned_sets for this exercise
+	const { error: setsDeleteError } = await supabase
+		.from('planned_sets')
+		.delete()
+		.eq('planned_exercise_id', plannedExerciseId);
+
+	if (setsDeleteError) {
+		console.error('Failed to delete planned sets:', setsDeleteError.message);
+		return { success: false, error: setsDeleteError.message };
+	}
+
+	// 4. Update planned_exercises row
+	const { error: updateError } = await supabase
+		.from('planned_exercises')
+		.update({
+			exercise_id: newExerciseId,
+			exercise_name: newExerciseName,
+			notes: null,
+			rationale: null,
+			alternatives: null
+		})
+		.eq('id', plannedExerciseId);
+
+	if (updateError) {
+		console.error('Failed to update planned exercise:', updateError.message);
+		return { success: false, error: updateError.message };
+	}
+
+	// 5. Insert 3 fresh default planned_sets
+	const { error: insertError } = await supabase.from('planned_sets').insert([
+		{ planned_exercise_id: plannedExerciseId, set_number: 1, target_reps: 10, target_weight: null },
+		{ planned_exercise_id: plannedExerciseId, set_number: 2, target_reps: 10, target_weight: null },
+		{ planned_exercise_id: plannedExerciseId, set_number: 3, target_reps: 10, target_weight: null }
+	]);
+
+	if (insertError) {
+		console.error('Failed to insert default sets:', insertError.message);
+		return { success: false, error: insertError.message };
+	}
+
+	return { success: true };
 }
