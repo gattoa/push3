@@ -192,12 +192,108 @@ Weekly Check-In (athlete completes — configurable day)
 
 Plan Generation (once per week per user — synchronous)
   → Assemble full context server-side from Supabase + self-hosted ExerciseDB
-  → Submit to Claude (synchronous API)
+  → Filter exercise catalog by injuries (server-side, before Claude call)
+  → Submit to Claude (synchronous API) — plan + rationale per exercise
   → Validate returned plan against exercise catalog and constraints
   → Save new plan to Supabase
+  → Fire-and-forget: generate 3 swap alternatives per exercise (background Claude call)
 
 Athlete begins new week
-  → Fetch current plan from Supabase
+  → Fetch current plan from Supabase (includes alternatives + rationale)
   → Log performance throughout the week
+  → Swap exercises mid-workout if needed (pre-generated alternatives or ExerciseDB fallback)
   → Cycle repeats at next check-in
 ```
+
+---
+
+## Exercise Intelligence (Phase 8+)
+
+Phase 8 added three capabilities to the generation pipeline: injury filtering, AI rationale, and pre-generated swap alternatives. It also introduced a workout-side exercise swap flow.
+
+### Injury Filtering
+
+**File:** `src/lib/server/injuries.ts`
+
+Server-side catalog filtering before exercises reach Claude. This is a hard filter — injured body regions produce zero exercises targeting those areas, regardless of what Claude might otherwise prescribe.
+
+**How it works:**
+- `INJURY_BODY_MAP` maps injury keywords (knee, shoulder, back, wrist, elbow, hip, ankle, neck, chest) to ExerciseDB `bodyPart` and `target` values
+- `filterByInjuries(exercises, injuries)` uses substring matching on the athlete's injury strings against the map keys
+- Returns `{ filtered, excluded }` — the filtered catalog is what Claude sees; excluded exercises are logged for debugging
+- Applied at plan generation time (`src/lib/server/generate.ts`) after fetching the exercise catalog from ExerciseDB
+
+### Rationale Generation
+
+Each exercise in the plan includes a brief "why this exercise" coach note, generated inline during plan generation.
+
+- System prompt rule 14 instructs Claude to produce a rationale string per exercise
+- Stored in `planned_exercises.rationale` (text, nullable)
+- Displayed in the workout UI when the exercise card is expanded (small italic text, muted color)
+- Cleared when the athlete swaps the exercise
+
+### Background Alternatives
+
+**File:** `src/lib/server/alternatives.ts`
+
+After the plan is saved, a separate Claude call generates 3 swap alternatives per exercise. This runs as a fire-and-forget background task — the plan is returned to the athlete immediately.
+
+**Flow:**
+```
+Plan saved to Supabase
+  → computeAlternativesForPlan() called without await
+  → Errors caught and logged (never blocks the response)
+
+Background task:
+  → Fetch user settings (equipment, injuries, experience, goals)
+  → Fetch all planned exercises grouped by day
+  → Build candidate catalog from user's equipment via getExercisesByEquipment()
+  → Single Claude Sonnet call (claude-sonnet-4-20250514, max_tokens: 4000)
+  → Tool: set_alternatives — forces structured output
+  → Persist to planned_exercises.alternatives (jsonb) per exercise
+```
+
+**`set_alternatives` tool schema:**
+- Input: array of `{ planned_exercise_id, alternatives[] }`
+- Each alternative: `{ exercise_id, exercise_name, body_part, target, equipment }`
+- Exactly 3 alternatives per exercise
+
+**Selection criteria (from system prompt):**
+- Match movement pattern (press→press, hinge→hinge, pull→pull)
+- Suit athlete's experience level and goals
+- Use varied equipment across the 3 alternatives
+- Don't repeat exercises already on the same training day
+- Exclude the exercise itself
+- Avoid injured body parts
+
+**Cost:** ~2K-3K input tokens + ~1.5K output tokens per plan. Not on critical path, so latency impact is zero.
+
+### Swap Flow (Workout-Side)
+
+Two API endpoints handle exercise swaps during a workout:
+
+**`/api/swap-exercise`** — Performs the swap:
+1. Validates user ownership (planned_exercise → planned_day → weekly_plan → user_id)
+2. Deletes all `set_logs` for the exercise's sets
+3. Deletes all `planned_sets`
+4. Updates `planned_exercises` row: new exercise_id/name, clears notes/rationale/alternatives to null
+5. Inserts 3 fresh default sets (10 reps, null target weight)
+
+**`/api/swap-alternatives`** — ExerciseDB fallback when pre-generated alternatives are unavailable:
+1. Fetches user equipment from Supabase
+2. Gets current exercise's target muscle via ExerciseDB
+3. Queries ExerciseDB for exercises with same target muscle
+4. Filters by user's available equipment, excludes current exercise
+5. Returns top 3
+
+### `get_exercise_history` RPC
+
+**Migration:** `00004_exercise_history_rpc.sql` (Phase 7)
+
+Provides per-exercise historical context for the workout UI — "Last: 135×8" display and PR detection.
+
+- **Input:** `p_user_id` (uuid), `p_exercise_ids` (text[])
+- **Returns:** JSONB object keyed by exercise_id, each with `{ last_weight, last_reps, best_e1rm }`
+- **`last_weight` / `last_reps`:** From the most recent completed set (by `logged_at`), excluding the current week
+- **`best_e1rm`:** All-time best estimated 1RM via Epley formula (`weight × (1 + reps / 30)`)
+- **Index:** `idx_planned_exercises_exercise_id` on `planned_exercises(exercise_id)` for efficient lookups

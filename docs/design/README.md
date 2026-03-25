@@ -37,7 +37,7 @@ All page-level design specs live in [`pages/`](pages/).
 
 | Page | Doc | Status |
 |---|---|---|
-| Daily Workout (`/workout`) | [pages/daily-workout.md](pages/daily-workout.md) | Current (v0.2.0 — banners, historical perf, rest day state, exercise swaps, completion summary updated) |
+| Daily Workout (`/workout`) | [pages/daily-workout.md](pages/daily-workout.md) | Current (v0.3.0 — progressive disclosure, arc gauges, segmented progress, set interaction model, color semantics, exercise swaps, AI rationale) |
 | Weekly Agenda (`/plan`) | [pages/weekly-agenda.md](pages/weekly-agenda.md) | Current (v0.2.0 — check-in link removed, plan review destination added) |
 | Exercise Detail (`/exercise/[id]`) | [pages/exercise-detail.md](pages/exercise-detail.md) | Current |
 | Weekly Check-In (`/check-in`) | [pages/check-in.md](pages/check-in.md) | Current (v0.2.0 — entry point consolidated to banner-only) |
