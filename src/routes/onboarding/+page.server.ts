@@ -1,5 +1,6 @@
 import { redirect, fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
+import type { UserSettingsUpdate } from '$lib/types/database';
 import { updateUserSettings } from '$lib/server/supabase';
 
 export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase } }) => {
@@ -32,10 +33,22 @@ export const actions: Actions = {
 		const goals = formData.get('goals') as string;
 		const experience_level = formData.get('experience_level') as string;
 		const equipment = formData.getAll('equipment') as string[];
+
+		// Station/furniture items are not ExerciseDB equipment types.
+		// Map them to the actual equipment they imply access to.
+		const EQUIPMENT_EXPANSIONS: Record<string, string[]> = {
+			'bench': [],              // bench exercises are covered by barbell/dumbbell
+			'squat rack': ['barbell'], // squat rack implies barbell access
+			'pull-up bar': []          // pull-up exercises are covered by 'body weight'
+		};
+
+		let dbEquipment = equipment.flatMap((eq) => EQUIPMENT_EXPANSIONS[eq] ?? [eq]);
+		dbEquipment = [...new Set(dbEquipment)];
+
 		// Always include bodyweight — it's not "equipment", everyone has a body
 		// ExerciseDB uses "body weight" (with space) as the equipment key
-		if (!equipment.includes('body weight')) {
-			equipment.push('body weight');
+		if (!dbEquipment.includes('body weight')) {
+			dbEquipment.push('body weight');
 		}
 		const training_days_per_week = parseInt(formData.get('training_days_per_week') as string, 10);
 		const session_duration_minutes = parseInt(formData.get('session_duration_minutes') as string, 10);
@@ -45,7 +58,7 @@ export const actions: Actions = {
 			.filter(Boolean) ?? [];
 		const unit_pref = (formData.get('unit_pref') as 'lb' | 'kg') || 'lb';
 
-		// Validate required fields
+		// Validate required fields (check original equipment selection, not mapped)
 		if (!date_of_birth || !gender || !goals || !experience_level || equipment.length === 0 || !training_days_per_week || !session_duration_minutes) {
 			return fail(400, { message: 'Please complete all required fields.' });
 		}
@@ -55,12 +68,12 @@ export const actions: Actions = {
 			return fail(400, { message: 'Invalid gender value.' });
 		}
 
-		const settingsPayload = {
+		const settingsPayload: UserSettingsUpdate = {
 			date_of_birth,
 			gender: gender as 'male' | 'female' | 'prefer_not_to_say',
 			goals,
 			experience_level,
-			equipment,
+			equipment: dbEquipment,
 			injuries,
 			training_days_per_week,
 			session_duration_minutes,

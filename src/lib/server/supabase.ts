@@ -55,7 +55,7 @@ export async function updateUserSettings(
 		.single();
 
 	if (error) {
-		console.error('Failed to upsert user settings:', error.message);
+		console.error('Failed to upsert user settings:', error.message, '| code:', error.code, '| details:', error.details, '| hint:', error.hint);
 		return null;
 	}
 	return data;
