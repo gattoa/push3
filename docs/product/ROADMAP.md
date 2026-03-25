@@ -1,6 +1,6 @@
 # Push — Product Roadmap
 
-> Last updated: 2026-03-23
+> Last updated: 2026-03-25
 >
 > **POC** (Phases 0–5): Prove the end-to-end feedback loop. ✅ Complete.
 > **MLP** (Phases 6+): Make the loop worth using daily. 🔄 Planning.
@@ -303,13 +303,13 @@ Features drawn from design specs, research recommendations, and gaps identified 
 
 | Feature | Source Doc | Notes |
 |---|---|---|
-| Onboarding: DOB + gender, reordered flow | `onboarding.md` | Doc is ahead of code. Adds demographic-aware AI coaching. Requires new DB columns. |
-| Exercise swaps | `daily-workout.md`, UX Brief Cluster B | Pre-generated alternatives, swap UI during workout. Key differentiator per research. |
-| Historical performance display ("Last: weight×reps") | `daily-workout.md` | Data exists in generation context but not surfaced in workout UI. |
-| PR icon on personal records | `daily-workout.md` | Visual celebration when athlete sets a new personal best. |
-| Completion summary | `daily-workout.md` | Post-workout summary card when all sets are done. |
-| Progress tab | Design README (nav architecture) | Referenced as second nav tab. No spec, no route, no code. **Needs a design spec.** |
-| Banner system refinements | `daily-workout.md` | 48hr persistence, max-one-at-a-time arbitration, dismiss logic. |
+| ~~Onboarding: DOB + gender, reordered flow~~ | ~~`onboarding.md`~~ | ~~Shipped in Phase 6.~~ |
+| ~~Exercise swaps~~ | ~~`daily-workout.md`, UX Brief Cluster B~~ | ~~Shipped in Phase 8.~~ |
+| ~~Historical performance display ("Last: weight×reps")~~ | ~~`daily-workout.md`~~ | ~~Shipped in Phase 7.~~ |
+| ~~PR icon on personal records~~ | ~~`daily-workout.md`~~ | ~~Shipped in Phase 7.~~ |
+| ~~Completion summary~~ | ~~`daily-workout.md`~~ | ~~Shipped in Phase 7.~~ |
+| Progress tab | Design README (nav architecture) | Referenced as second nav tab. Design spec exists (`progress.md`). **Phase 9.** |
+| ~~Banner system refinements~~ | ~~`daily-workout.md`~~ | ~~Shipped in Phase 7.~~ |
 | Plan review destination | `weekly-agenda.md` | Newly generated week preview before athlete starts training. |
 
 ### From Research Recommendations
@@ -319,7 +319,7 @@ Features drawn from design specs, research recommendations, and gaps identified 
 | Week 1 critical engagement design | 77% drop within 3 days without engagement; Week 1 predicts 6-month retention | Optimize first-week experience: quick wins, encouragement, low friction. |
 | Review Day (streak + celebration + preview) | Retention drivers: streak visibility, positive reinforcement, next-week anticipation | End-of-week experience beyond just the check-in form. |
 | Autoregulated deloads | Exercise science: periodization and recovery signals | AI detects fatigue/plateau patterns, prescribes lighter weeks. |
-| Injury exclusions in generation | Safety is make-or-break (LLM hallucination risk) | Current prompt mentions injuries but exclusion logic is basic. Needs robust filtering. |
+| ~~Injury exclusions in generation~~ | ~~Safety is make-or-break (LLM hallucination risk)~~ | ~~Shipped in Phase 8. Server-side filtering in `injuries.ts`.~~ |
 | Calibrated celebrations | Fitness-level appropriate feedback | Beginner PRs ≠ advanced PRs. Avoid patronizing or unrealistic praise. |
 | Accessibility standards | Inclusive design | Touch targets, contrast ratios, screen reader support. |
 
@@ -332,7 +332,7 @@ Features drawn from design specs, research recommendations, and gaps identified 
 | Progress photos | Secondary signal | Visual progress is a major retention driver. |
 | Dual logging (quick + granular) | Single path captures required data | Quick-complete for easy sets reduces friction. |
 | Plan review celebration UX | POC validates adaptation, not presentation | First impression of the new plan matters for retention. |
-| AI rationale captions | Not required to prove loop | "Why this exercise?" builds trust in the AI coach. |
+| ~~AI rationale captions~~ | ~~Not required to prove loop~~ | ~~Shipped in Phase 8. Stored in `planned_exercises.rationale`.~~ |
 | Service worker migration (`@vite-pwa/sveltekit`) | Manual SW was sufficient for POC | Proper PWA tooling needed for offline, caching, update prompts. |
 
 ### Technical Foundations (not user-facing but MLP-enabling)
@@ -340,8 +340,8 @@ Features drawn from design specs, research recommendations, and gaps identified 
 | Item | Notes |
 |---|---|
 | Test coverage | Zero tests today. Set logging, generation, and check-in flows need at minimum integration tests. |
-| API rate limiting | `/api/generate-plan` calls Claude with no throttling. Cost exposure risk at scale. |
-| Input validation | API routes accept POST bodies without schema validation. |
+| ~~API rate limiting~~ | ~~Shipped in Phase 8. 60-second cooldown on `/api/generate-plan` (HTTP 429).~~ |
+| ~~Input validation~~ | ~~Shipped in Phases 7-8. Schema validation on `/api/log-set` and `/api/generate-plan`.~~ |
 | Analytics / telemetry | No way to measure engagement, retention, or plan quality. |
 
 ---
@@ -354,79 +354,52 @@ Each phase is independently branchable and deployable.
 
 ---
 
-### Phase 6: Onboarding Overhaul
+### Phase 6: Onboarding Overhaul ✅
 
 **Goal:** Align onboarding code to the design spec. Collect demographics for smarter AI coaching.
+**Status:** Complete
 **Branch:** `feature/onboarding-overhaul`
 
-| Deliverable | Source | Notes |
-|---|---|---|
-| DOB + gender fields | `onboarding.md` | New Step 1: date picker + gender chips. Requires DB migration (`date_of_birth`, `gender` columns). |
-| Step reorder | `onboarding.md` | About You → Experience → Goals → Equipment → Schedule → Injuries |
-| Remove unit preference step | `onboarding.md` | Default to `lb`. Changeable in Progress tab settings (Phase 9). |
-| Injury yes/no gate | `onboarding.md` | Binary choice → expand if yes. If no → "Generate My Plan" immediately. |
-| Demographic-aware generation prompt | `onboarding.md` | Seniors (60+): intensity caps, functional movement. Under-18: bodyweight/machine priority. Gender-informed volume. **Requires isolated prompt testing.** |
-
-**Technical (threaded):**
-- DB migration for new columns
-- Type updates (`UserSettings`, `UserSettingsUpdate`)
-- Input validation on onboarding form action
-
-**Exit criteria:**
-- New user completes onboarding in under 2 minutes
-- DOB and gender are captured and persisted
-- Generation prompt produces age/gender-appropriate plans (validated via prompt testing)
-- Unit preference no longer appears in onboarding flow
+### What Exists
+- 6-step onboarding flow reordered: About You → Experience → Goals → Equipment → Schedule → Injuries
+- DOB (date picker) and gender (chip select) fields in new Step 1
+- DB migration (`00003_add_demographics.sql`): `date_of_birth` and `gender` columns on `user_settings`
+- Unit preference removed from onboarding; defaults to `lb`
+- Injury yes/no gate: binary choice → expand if yes, "Generate My Plan" if no
+- Demographic-aware generation prompt: age/gender rules in system prompt
+- Type updates for `UserSettings` and `UserSettingsUpdate`
 
 ---
 
-### Phase 7: Workout Experience
+### Phase 7: Workout Experience ✅
 
 **Goal:** Make the daily workout feel polished and informative — not just functional.
+**Status:** Complete
 **Branch:** `feature/workout-polish`
 
-| Deliverable | Source | Notes |
-|---|---|---|
-| Historical performance display | `daily-workout.md` | "Last: 135×8" below exercise name. Data exists in generation context — needs to be surfaced in workout UI. |
-| PR detection and icon | `daily-workout.md` | Estimated 1RM via Epley formula. Compare against user's all-time best per exercise. Accent icon on the set row. |
-| Completion summary card | `daily-workout.md` | Appears when all sets have status. Shows completed/skipped counts + total volume. CTA: "View Weekly Plan." |
-| Banner system | `daily-workout.md` | Plan review banner (after generation) + check-in banner (on check-in day). 48hr persistence, max one at a time, dismiss logic. |
-
-**Technical (threaded):**
-- Input validation on `/api/log-set` (schema validation for set log payloads)
-
-**Exit criteria:**
-- Athlete sees their last performance for recurring exercises
-- PR icon appears when a personal best is set
-- Workout completion shows a summary card
-- Banners appear at the right times and dismiss correctly
+### What Exists
+- Historical performance display: "Last: weight×reps" below exercise name via `get_exercise_history` RPC (migration `00004`)
+- PR detection: Epley estimated 1RM comparison, gold trophy badge on set rows and exercise card headers (`src/lib/utils/pr.ts`)
+- Completion summary card: appears when all sets resolved, shows done/skipped/volume/PRs stats, gold celebrate theme
+- Banner system: `Banner.svelte` component + `banner.ts` utils, check-in banner (Sunday, lavender) + plan review banner (<48hrs, mint), server-side logic in `+page.server.ts`, 48hr localStorage persistence, dismiss with ×
+- Input validation on `/api/log-set`
 
 ---
 
-### Phase 8: Exercise Intelligence
+### Phase 8: Exercise Intelligence ✅
 
 **Goal:** Build trust in the AI coach by giving athletes control and transparency. Lands generation/schema changes while codebase is close to current shape.
+**Status:** Complete
 **Branch:** `feature/exercise-intelligence`
 
-| Deliverable | Source | Notes |
-|---|---|---|
-| Pre-generated swap alternatives | `daily-workout.md` | During plan generation, AI produces 3 alternatives per exercise. Stored in `planned_exercises.alternatives` (JSON array). |
-| Swap UI | `daily-workout.md` | Swipe left on exercise card → inline expansion with 3 alternatives. Tap to replace. Sets reset. |
-| Swap fallback | `daily-workout.md` | ExerciseDB query (same muscle + user equipment − current day exercises) if pre-generated alternatives unavailable. |
-| AI rationale captions | Backlog | "Why this exercise?" — brief coach note per exercise. Stored during generation. |
-| Injury exclusion hardening | Research | Robust filtering: exercises targeting injured body regions excluded at generation time, not just mentioned in prompt. |
-
-**Technical (threaded):**
-- Schema change: `planned_exercises.alternatives` column (jsonb)
-- Schema change: `planned_exercises.rationale` column (text, nullable)
-- Generation prompt updates for alternatives + rationale output
-- API rate limiting on `/api/generate-plan`
-
-**Exit criteria:**
-- Every generated exercise has 3 pre-generated alternatives
-- Athlete can swap an exercise mid-workout without leaving the screen
-- AI rationale visible per exercise
-- Injured body regions produce zero exercises targeting those areas
+### What Exists
+- Pre-generated swap alternatives: 3 per exercise, generated via background task after plan save (fire-and-forget Claude call with `set_alternatives` tool). Stored in `planned_exercises.alternatives` (jsonb). Optimized from inline generation to reduce plan generation latency (commit 3ffc921).
+- Swap UI: swipe left (60px threshold) triggers flip-card animation revealing alternatives list. Tap to replace exercise; sets reset to 3×10 with null weights.
+- Swap fallback: `/api/swap-alternatives` queries ExerciseDB by target muscle + user equipment when pre-generated alternatives unavailable.
+- AI rationale captions: "Why this exercise?" per exercise, generated inline during plan generation (system prompt rule 14). Stored in `planned_exercises.rationale`. Displayed when exercise card is expanded.
+- Injury exclusion hardening: server-side filtering in `src/lib/server/injuries.ts` — maps injury strings to body parts/targets, filters exercise catalog before it reaches Claude. Applied at both plan generation and alternative generation.
+- Schema migrations: `00005_exercise_intelligence.sql` (alternatives + rationale columns, UPDATE/DELETE RLS policies), `00006_update_rpc_exercise_intelligence.sql` (updated `get_full_plan` RPC)
+- API rate limiting: 60-second cooldown on `/api/generate-plan` (HTTP 429)
 
 ---
 
@@ -443,6 +416,7 @@ Each phase is independently branchable and deployable.
 | Personal records list | `progress.md` | Estimated 1RM per exercise (Epley). Top PRs sorted descending. "See all" expands full list. |
 | Training calendar | `progress.md` | Month grid with trained/rest dots. Tap for mini-summary. |
 | Settings page | `progress.md` | `/progress/settings` — unit preference, training days, session duration, sign out. |
+| Enhanced rest day state | `daily-workout.md` | Rich rest day on `/workout`: week-so-far summary (days trained, sets completed, completion %) + next training day preview with exercise list. Reuses progress data queries. |
 
 **Technical (threaded):**
 - Consider `get_progress_summary` RPC if client-side aggregation is slow
@@ -453,6 +427,7 @@ Each phase is independently branchable and deployable.
 - Progress tab loads with real data from existing tables
 - Settings changes persist and take effect on next plan generation
 - Cold start / empty states render gracefully
+- Rest day on `/workout` shows week-so-far summary and next training day preview
 
 ---
 
@@ -485,6 +460,8 @@ From `architecture-plan-generation.md` (source of truth):
 ```
 user_settings
 ├── user_id (uuid, FK → auth.users)
+├── date_of_birth (date, nullable) — Phase 6
+├── gender (text, nullable) — Phase 6
 ├── goals, equipment, injuries, experience_level
 ├── session_duration, training_days, unit_pref
 └── updated_at
@@ -496,7 +473,9 @@ planned_days
 ├── id, plan_id, day_index, split_label
 
 planned_exercises
-├── id, day_id, exercise_id, order_index, notes
+├── id, day_id, exercise_id, exercise_name, order_index, notes
+├── alternatives (jsonb, nullable) — Phase 8
+├── rationale (text, nullable) — Phase 8
 
 planned_sets
 ├── id, exercise_id (FK → planned_exercises), set_number
