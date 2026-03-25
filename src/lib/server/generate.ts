@@ -10,6 +10,7 @@ import type { GenerationContext } from '$lib/types/database';
 import type { Exercise } from '$lib/types/exercise';
 import { getGenerationContext, savePlan } from '$lib/server/supabase';
 import { getExercisesByEquipment } from '$lib/server/exercisedb';
+import { filterByInjuries } from '$lib/server/injuries';
 
 // ============================================================================
 // Types for Claude's structured output
@@ -25,10 +26,20 @@ export interface GeneratedDay {
 	exercises: GeneratedExercise[];
 }
 
+export interface GeneratedAlternative {
+	exercise_id: string;
+	exercise_name: string;
+	body_part: string;
+	target: string;
+	equipment: string;
+}
+
 export interface GeneratedExercise {
 	exercise_id: string;
 	exercise_name: string;
 	notes: string | null;
+	rationale: string | null;
+	alternatives: GeneratedAlternative[];
 	sets: GeneratedSet[];
 }
 
@@ -80,6 +91,25 @@ const PLAN_TOOL: Anthropic.Tool = {
 										type: ['string', 'null'],
 										description: 'Optional coaching note for this exercise (e.g. "Focus on slow eccentric", "Superset with next exercise")'
 									},
+									rationale: {
+										type: ['string', 'null'],
+										description: 'Brief explanation of why this exercise was chosen for this athlete (e.g. "Compound chest press to build pressing strength — progressed from 135 lb last week")'
+									},
+									alternatives: {
+										type: 'array',
+										description: 'Exactly 3 swap alternatives from the exercise catalog. Must target the same or similar muscle group. Include variety in equipment.',
+										items: {
+											type: 'object',
+											properties: {
+												exercise_id: { type: 'string', description: 'ExerciseDB exercise ID from the catalog' },
+												exercise_name: { type: 'string', description: 'Human-readable exercise name' },
+												body_part: { type: 'string', description: 'Body part from the catalog (e.g. "chest", "back")' },
+												target: { type: 'string', description: 'Target muscle from the catalog (e.g. "pectorals", "lats")' },
+												equipment: { type: 'string', description: 'Equipment required (e.g. "dumbbell", "cable")' }
+											},
+											required: ['exercise_id', 'exercise_name', 'body_part', 'target', 'equipment']
+										}
+									},
 									sets: {
 										type: 'array',
 										items: {
@@ -96,7 +126,7 @@ const PLAN_TOOL: Anthropic.Tool = {
 										}
 									}
 								},
-								required: ['exercise_id', 'exercise_name', 'notes', 'sets']
+								required: ['exercise_id', 'exercise_name', 'notes', 'rationale', 'alternatives', 'sets']
 							}
 						}
 					},
@@ -137,6 +167,13 @@ function buildSystemPrompt(): string {
 11. Use the athlete's unit preference (lb or kg) for all target weights.
 12. Exercise variety is critical. Do NOT repeat the same exercise across multiple training days in the same week. Each training day should have a distinct set of exercises. Exercises may recur across weeks but not within the same week.
 13. Select a diverse mix of exercises from the catalog — vary movement patterns (push, pull, hinge, squat, carry, isolation) and target different muscle groups across the week.
+15. For each exercise, provide a brief rationale explaining why it was chosen — reference the athlete's goals, progression, or programming logic.
+16. For each exercise, provide exactly 3 swap alternatives from the exercise catalog:
+    - Alternatives must target the same or similar muscle group as the prescribed exercise.
+    - Vary the equipment across alternatives where possible (e.g., if the main exercise uses barbell, offer dumbbell and cable alternatives).
+    - Do NOT include the prescribed exercise itself as an alternative.
+    - Do NOT include any other exercise already prescribed in the same day.
+    - Every alternative exercise_id must exist in the provided exercise catalog.
 14. Demographic-aware programming:
     - Athletes aged 60+: cap working intensity at RPE 7-8, emphasize functional movements (squats to chair, farmer carries, step-ups), include balance work, avoid heavy axial loading.
     - Athletes under 18: prioritize bodyweight and machine exercises, limit heavy compound barbell lifts (no 1-3RM), focus on movement quality and moderate rep ranges (8-15).
@@ -292,10 +329,17 @@ export async function generatePlan(
 		return { error: `A plan already exists for week ${context.next_week_number}.` };
 	}
 
-	// 3. Build exercise catalog filtered by athlete's equipment
+	// 3. Build exercise catalog filtered by athlete's equipment + injuries
 	console.log('[generate] Equipment:', context.user_settings.equipment);
-	const catalog = await buildExerciseCatalog(context.user_settings.equipment);
-	console.log('[generate] Catalog size:', catalog.length);
+	const rawCatalog = await buildExerciseCatalog(context.user_settings.equipment);
+	console.log('[generate] Raw catalog size:', rawCatalog.length);
+
+	const { filtered: catalog, excluded } = filterByInjuries(rawCatalog, context.user_settings.injuries);
+	if (excluded.bodyParts.length > 0 || excluded.targets.length > 0) {
+		console.log('[generate] Injury filter excluded bodyParts:', excluded.bodyParts, 'targets:', excluded.targets);
+		console.log('[generate] Catalog size after injury filter:', catalog.length);
+	}
+
 	console.log('[generate] Sample exercises:', catalog.slice(0, 10).map(e => `${e.id} — ${e.name} (${e.bodyPart}/${e.target})`));
 	if (catalog.length === 0) {
 		return { error: 'No exercises found for your equipment. Please update your profile.' };
@@ -309,7 +353,7 @@ export async function generatePlan(
 	try {
 		const response = await anthropic.messages.create({
 			model: 'claude-sonnet-4-20250514',
-			max_tokens: 8000,
+			max_tokens: 10000,
 			system: buildSystemPrompt(),
 			tools: [PLAN_TOOL],
 			tool_choice: { type: 'tool', name: 'generate_weekly_plan' },
@@ -362,6 +406,8 @@ export async function generatePlan(
 				exercise_name: ex.exercise_name,
 				order_index: i,
 				notes: ex.notes,
+				rationale: ex.rationale ?? null,
+				alternatives: ex.alternatives ?? null,
 				sets: ex.sets.map((s) => ({
 					set_number: s.set_number,
 					target_reps: s.target_reps,

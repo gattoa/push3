@@ -1,7 +1,7 @@
 <script lang="ts">
 	import {
 		Check, X, Menu, Trophy,
-		ChevronDown, TrendingUp, Flame, Dumbbell, Eye
+		ChevronDown, TrendingUp, Flame, Dumbbell, Eye, ArrowLeftRight
 	} from 'lucide-svelte';
 	import type { FullPlanDay, FullPlanExercise, FullPlanSet } from '$lib/types/database';
 	import { isPR as isPRUtil } from '$lib/utils/pr';
@@ -162,6 +162,85 @@
 	}
 	let expandedExercise = $state<string | null>(getInitialExpanded());
 
+	// ── Swipe-to-Flip (Swap) ─────────────────────────────────
+	let flippedId = $state<string | null>(null);
+	let swipingId = $state<string | null>(null);
+	let swipeStartX = $state(0);
+	let swipeStartY = $state(0);
+	let swipeLocked = $state<'horizontal' | 'vertical' | null>(null);
+	let didSwipe = $state(false);
+	const SWIPE_THRESHOLD = 60;
+
+	function handlePointerDown(e: PointerEvent, exerciseId: string) {
+		if (flippedId && flippedId !== exerciseId) return;
+		e.preventDefault();
+		swipingId = exerciseId;
+		swipeStartX = e.clientX;
+		swipeStartY = e.clientY;
+		swipeLocked = null;
+		didSwipe = false;
+		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+	}
+
+	function handlePointerMove(e: PointerEvent) {
+		if (!swipingId) return;
+		const dx = e.clientX - swipeStartX;
+		const dy = e.clientY - swipeStartY;
+		if (!swipeLocked && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
+			swipeLocked = Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical';
+		}
+		if (swipeLocked === 'vertical') {
+			swipingId = null;
+			swipeLocked = null;
+		}
+	}
+
+	function handlePointerUp(e: PointerEvent) {
+		if (!swipingId) return;
+		const dx = e.clientX - swipeStartX;
+		if (swipeLocked === 'horizontal') {
+			if (dx < -SWIPE_THRESHOLD && !flippedId) {
+				flippedId = swipingId;
+				didSwipe = true;
+			} else if (dx > SWIPE_THRESHOLD && flippedId === swipingId) {
+				flippedId = null;
+				didSwipe = true;
+			}
+		}
+		swipingId = null;
+		swipeLocked = null;
+	}
+
+	function handleCardClick(exerciseId: string, isExpanded: boolean) {
+		if (didSwipe) { didSwipe = false; return; }
+		expandedExercise = isExpanded ? null : exerciseId;
+	}
+
+	const MOCK_ALTERNATIVES: Record<string, { exercise_id: string; exercise_name: string; target: string; equipment: string }[]> = {};
+	function getMockAlternatives(exercise: FullPlanExercise) {
+		if (MOCK_ALTERNATIVES[exercise.id]) return MOCK_ALTERNATIVES[exercise.id];
+		const alts = [
+			{ exercise_id: 'alt-1', exercise_name: 'Romanian Deadlift', target: 'hamstrings', equipment: 'barbell' },
+			{ exercise_id: 'alt-2', exercise_name: 'Sumo Deadlift', target: 'glutes', equipment: 'barbell' },
+			{ exercise_id: 'alt-3', exercise_name: 'Good Morning', target: 'hamstrings', equipment: 'barbell' }
+		];
+		MOCK_ALTERNATIVES[exercise.id] = alts;
+		return alts;
+	}
+
+	function getMockRationale(_exercise: FullPlanExercise): string {
+		return 'Builds foundational hip hinge strength for your lower body day.';
+	}
+
+	function hasPendingSets(exercise: FullPlanExercise): boolean {
+		return exercise.sets.some((s) => setStates[s.id]?.status === 'pending');
+	}
+
+	function handleSwapSelect(exerciseId: string, altName: string) {
+		console.log('[swap] Replace exercise', exerciseId, 'with', altName);
+		flippedId = null;
+	}
+
 	// ── Banner (localStorage-backed persistence) ─────────────
 	let showBanner = $state(true);
 	$effect(() => {
@@ -309,161 +388,194 @@
 				{@const hasPR = exercise.sets.some((s) => isPR(exercise.exercise_id, s.id))}
 				{@const hist = exerciseHistory[exercise.exercise_id]}
 
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<div
-					class="card push-up"
-					class:card-completed={exState === 'completed'}
-					class:card-active={exState === 'active'}
-					class:card-upcoming={exState === 'upcoming'}
+					class="flip-container push-up"
+					class:flipped={flippedId === exercise.id}
 					style="--d:{i + 2}"
+					onpointerdown={(e) => (flippedId === exercise.id || (isExpanded && hasPendingSets(exercise))) ? handlePointerDown(e, exercise.id) : null}
+					onpointermove={handlePointerMove}
+					onpointerup={handlePointerUp}
+					onpointercancel={() => { swipingId = null; swipeLocked = null; }}
 				>
-					<!-- Exercise Header (tappable accordion) -->
-					<button class="card-header" onclick={() => expandedExercise = isExpanded ? null : exercise.id}>
-						<span class="card-num" class:card-num-done={exState === 'completed' && !hasPR} class:card-num-pr={exState === 'completed' && hasPR} class:card-num-upcoming={exState === 'upcoming'}>
-							{#if exState === 'completed'}
-								<Check size={13} strokeWidth={3} />
-							{:else}
-								{i + 1}
-							{/if}
-						</span>
-						<div class="card-info">
-							{#if isExpanded}
-								<a
-									href="/exercise/{exercise.exercise_id.replace(/\s+/g, '-')}?name={encodeURIComponent(exercise.exercise_name)}"
-									class="card-name-link"
-									onclick={(e) => e.stopPropagation()}
-								>
-									<h3 class="card-name">{exercise.exercise_name}</h3>
-								</a>
-							{:else}
-								<h3 class="card-name">{exercise.exercise_name}</h3>
-							{/if}
-							{#if exState === 'completed' && hasPR}
-								<span class="card-pr-label">
-									<Trophy size={11} strokeWidth={2} />
-									New PR
-								</span>
-							{:else if hist}
-								<span class="card-history">
-									<TrendingUp size={11} strokeWidth={2} />
-									Last: {hist.lastWeight} {unitPref} × {hist.lastReps}
-								</span>
-							{:else}
-								<span class="card-history card-new">
-									<Dumbbell size={11} strokeWidth={2} />
-									First time
-								</span>
-							{/if}
-						</div>
-
-						<!-- Per-exercise arc gauge -->
-						<div class="card-arc-wrap">
-							<svg class="card-arc" viewBox="0 0 52 32" fill="none">
-								<path d="M 4 28 A {EX_ARC_R} {EX_ARC_R} 0 0 1 48 28" stroke="var(--color-border)" stroke-width="3" stroke-linecap="round" fill="none" />
-								{#if prog.allPct > 0 && prog.hasSkips}
-									<path d="M 4 28 A {EX_ARC_R} {EX_ARC_R} 0 0 1 48 28" stroke="var(--color-danger)" stroke-width="3" stroke-linecap="round" fill="none" stroke-dasharray={EX_ARC_C} stroke-dashoffset={EX_ARC_C * (1 - prog.allPct / 100)} class="arc-fill" />
+					<!-- ═══ FRONT FACE ═══ -->
+					<div
+						class="card flip-front"
+						class:card-completed={exState === 'completed'}
+						class:card-active={exState === 'active'}
+						class:card-upcoming={exState === 'upcoming'}
+					>
+						<div class="card-header" role="button" tabindex="0" onclick={() => handleCardClick(exercise.id, isExpanded)} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCardClick(exercise.id, isExpanded); } }}>
+							<span class="card-num" class:card-num-done={exState === 'completed' && !hasPR} class:card-num-pr={exState === 'completed' && hasPR} class:card-num-upcoming={exState === 'upcoming'}>
+								{#if exState === 'completed'}
+									<Check size={13} strokeWidth={3} />
+								{:else}
+									{i + 1}
 								{/if}
-								{#if prog.activityPct > 0}
-									<path d="M 4 28 A {EX_ARC_R} {EX_ARC_R} 0 0 1 48 28" stroke="var(--color-activity)" stroke-width="3" stroke-linecap="round" fill="none" stroke-dasharray={EX_ARC_C} stroke-dashoffset={EX_ARC_C * (1 - prog.activityPct / 100)} class="arc-fill" />
-								{/if}
-								{#if prog.prPct > 0}
-									<path d="M 4 28 A {EX_ARC_R} {EX_ARC_R} 0 0 1 48 28" stroke="var(--color-celebrate)" stroke-width="3" stroke-linecap="round" fill="none" stroke-dasharray={EX_ARC_C} stroke-dashoffset={EX_ARC_C * (1 - prog.prPct / 100)} class="arc-fill" />
-								{/if}
-								{#if prog.allPct > 0 && !prog.hasSkips && prog.prPct === 0}
-									<path d="M 4 28 A {EX_ARC_R} {EX_ARC_R} 0 0 1 48 28" stroke="var(--color-activity)" stroke-width="3" stroke-linecap="round" fill="none" stroke-dasharray={EX_ARC_C} stroke-dashoffset={EX_ARC_C * (1 - prog.allPct / 100)} class="arc-fill" />
-								{/if}
-							</svg>
-							<span class="card-arc-label">{prog.done}/{prog.total}</span>
-						</div>
-
-						<span class="card-chevron" class:card-chevron-open={isExpanded}>
-							<ChevronDown size={16} strokeWidth={2} />
-						</span>
-					</button>
-
-					{#if exercise.notes && isExpanded}
-						<p class="card-notes">{exercise.notes}</p>
-					{/if}
-
-					<!-- Set Rows (collapsible) -->
-					{#if isExpanded}
-						<div class="sets">
-							{#each exercise.sets.slice().sort((a, b) => a.set_number - b.set_number) as set}
-								{@const s = setStates[set.id]}
-								{@const setIsPR = isPR(exercise.exercise_id, set.id)}
-								{#if s}
-									<div
-										class="set-row"
-										class:completed={s.status === 'completed'}
-										class:skipped={s.status === 'skipped'}
+							</span>
+							<div class="card-info">
+								{#if isExpanded}
+									<a
+										href="/exercise/{exercise.exercise_id.replace(/\s+/g, '-')}?name={encodeURIComponent(exercise.exercise_name)}"
+										class="card-name-link"
+										onclick={(e) => e.stopPropagation()}
 									>
-										<div class="set-num">
-											<span>{set.set_number}</span>
-										</div>
-
-										<div class="set-edit" class:set-struck={s.status === 'skipped'}>
-											<span class="set-input-wrap">
-												<input
-													type="number"
-													inputmode="decimal"
-													class="set-input"
-													placeholder={set.target_weight != null ? String(set.target_weight) : '—'}
-													bind:value={s.weight}
-													readonly={s.status !== 'pending'}
-												/>
-												<span class="set-input-unit">{unitPref}</span>
-											</span>
-											<span class="set-edit-x">×</span>
-											<span class="set-input-wrap">
-												<input
-													type="number"
-													inputmode="numeric"
-													class="set-input"
-													placeholder={String(set.target_reps)}
-													bind:value={s.reps}
-													readonly={s.status !== 'pending'}
-												/>
-											</span>
-											{#if s.status === 'completed' && setIsPR}
-												<span class="pr-badge">
-													<Trophy size={10} strokeWidth={2.5} />
-													PR
-												</span>
-											{/if}
-											{#if s.status === 'skipped'}
-												<span class="skip-marker">Skipped</span>
-											{/if}
-										</div>
-
-										<!-- Action buttons -->
-										<div class="set-actions">
-											{#if s.status === 'completed'}
-												<button class="set-btn set-btn-skip-idle set-btn-disabled" disabled>
-													<X size={13} strokeWidth={2} />
-												</button>
-												<button class="set-btn set-btn-done" onclick={() => handleComplete(set.id, exercise)} disabled={s.saving} title="Undo">
-													<Check size={16} strokeWidth={3} />
-												</button>
-											{:else if s.status === 'skipped'}
-												<button class="set-btn set-btn-skip-idle set-btn-skip-on" onclick={() => handleSkip(set.id)} disabled={s.saving} title="Undo skip">
-													<X size={13} strokeWidth={2} />
-												</button>
-												<button class="set-btn set-btn-confirm set-btn-disabled" disabled>
-													<Check size={16} strokeWidth={2.5} />
-												</button>
-											{:else}
-												<button class="set-btn set-btn-skip-idle" onclick={() => handleSkip(set.id)} disabled={s.saving} title="Skip set">
-													<X size={13} strokeWidth={2} />
-												</button>
-												<button class="set-btn set-btn-confirm" onclick={() => handleComplete(set.id, exercise)} disabled={s.saving} title="Done — log as prescribed">
-													<Check size={16} strokeWidth={2.5} />
-												</button>
-											{/if}
-										</div>
-									</div>
+										<h3 class="card-name">{exercise.exercise_name}</h3>
+									</a>
+								{:else}
+									<h3 class="card-name">{exercise.exercise_name}</h3>
 								{/if}
-							{/each}
+								{#if exState === 'completed' && hasPR}
+									<span class="card-pr-label">
+										<Trophy size={11} strokeWidth={2} />
+										New PR
+									</span>
+								{:else if hist}
+									<span class="card-history">
+										<TrendingUp size={11} strokeWidth={2} />
+										Last: {hist.lastWeight} {unitPref} × {hist.lastReps}
+									</span>
+								{:else}
+									<span class="card-history card-new">
+										<Dumbbell size={11} strokeWidth={2} />
+										First time
+									</span>
+								{/if}
+							</div>
+
+							<!-- Per-exercise arc gauge -->
+							<div class="card-arc-wrap">
+								<svg class="card-arc" viewBox="0 0 52 32" fill="none">
+									<path d="M 4 28 A {EX_ARC_R} {EX_ARC_R} 0 0 1 48 28" stroke="var(--color-border)" stroke-width="3" stroke-linecap="round" fill="none" />
+									{#if prog.allPct > 0 && prog.hasSkips}
+										<path d="M 4 28 A {EX_ARC_R} {EX_ARC_R} 0 0 1 48 28" stroke="var(--color-danger)" stroke-width="3" stroke-linecap="round" fill="none" stroke-dasharray={EX_ARC_C} stroke-dashoffset={EX_ARC_C * (1 - prog.allPct / 100)} class="arc-fill" />
+									{/if}
+									{#if prog.activityPct > 0}
+										<path d="M 4 28 A {EX_ARC_R} {EX_ARC_R} 0 0 1 48 28" stroke="var(--color-activity)" stroke-width="3" stroke-linecap="round" fill="none" stroke-dasharray={EX_ARC_C} stroke-dashoffset={EX_ARC_C * (1 - prog.activityPct / 100)} class="arc-fill" />
+									{/if}
+									{#if prog.prPct > 0}
+										<path d="M 4 28 A {EX_ARC_R} {EX_ARC_R} 0 0 1 48 28" stroke="var(--color-celebrate)" stroke-width="3" stroke-linecap="round" fill="none" stroke-dasharray={EX_ARC_C} stroke-dashoffset={EX_ARC_C * (1 - prog.prPct / 100)} class="arc-fill" />
+									{/if}
+									{#if prog.allPct > 0 && !prog.hasSkips && prog.prPct === 0}
+										<path d="M 4 28 A {EX_ARC_R} {EX_ARC_R} 0 0 1 48 28" stroke="var(--color-activity)" stroke-width="3" stroke-linecap="round" fill="none" stroke-dasharray={EX_ARC_C} stroke-dashoffset={EX_ARC_C * (1 - prog.allPct / 100)} class="arc-fill" />
+									{/if}
+								</svg>
+								<span class="card-arc-label">{prog.done}/{prog.total}</span>
+							</div>
+
+							<span class="card-chevron" class:card-chevron-open={isExpanded}>
+								<ChevronDown size={16} strokeWidth={2} />
+							</span>
 						</div>
-					{/if}
+
+						{#if isExpanded}
+							<p class="card-rationale">
+								{getMockRationale(exercise)}
+							</p>
+						{/if}
+
+						{#if exercise.notes && isExpanded}
+							<p class="card-notes">{exercise.notes}</p>
+						{/if}
+
+						<!-- Set Rows (collapsible) -->
+						{#if isExpanded}
+							<div class="sets">
+								{#each exercise.sets.slice().sort((a, b) => a.set_number - b.set_number) as set}
+									{@const s = setStates[set.id]}
+									{@const setIsPR = isPR(exercise.exercise_id, set.id)}
+									{#if s}
+										<div
+											class="set-row"
+											class:completed={s.status === 'completed'}
+											class:skipped={s.status === 'skipped'}
+										>
+											<div class="set-num">
+												<span>{set.set_number}</span>
+											</div>
+
+											<div class="set-edit" class:set-struck={s.status === 'skipped'}>
+												<span class="set-input-wrap">
+													<input
+														type="number"
+														inputmode="decimal"
+														class="set-input"
+														placeholder={set.target_weight != null ? String(set.target_weight) : '—'}
+														bind:value={s.weight}
+														readonly={s.status !== 'pending'}
+													/>
+													<span class="set-input-unit">{unitPref}</span>
+												</span>
+												<span class="set-edit-x">×</span>
+												<span class="set-input-wrap">
+													<input
+														type="number"
+														inputmode="numeric"
+														class="set-input"
+														placeholder={String(set.target_reps)}
+														bind:value={s.reps}
+														readonly={s.status !== 'pending'}
+													/>
+												</span>
+												{#if s.status === 'completed' && setIsPR}
+													<span class="pr-badge">
+														<Trophy size={10} strokeWidth={2.5} />
+														PR
+													</span>
+												{/if}
+												{#if s.status === 'skipped'}
+													<span class="skip-marker">Skipped</span>
+												{/if}
+											</div>
+
+											<!-- Action buttons -->
+											<div class="set-actions">
+												{#if s.status === 'completed'}
+													<button class="set-btn set-btn-skip-idle set-btn-disabled" disabled>
+														<X size={13} strokeWidth={2} />
+													</button>
+													<button class="set-btn set-btn-done" onclick={() => handleComplete(set.id, exercise)} disabled={s.saving} title="Undo">
+														<Check size={16} strokeWidth={3} />
+													</button>
+												{:else if s.status === 'skipped'}
+													<button class="set-btn set-btn-skip-idle set-btn-skip-on" onclick={() => handleSkip(set.id)} disabled={s.saving} title="Undo skip">
+														<X size={13} strokeWidth={2} />
+													</button>
+													<button class="set-btn set-btn-confirm set-btn-disabled" disabled>
+														<Check size={16} strokeWidth={2.5} />
+													</button>
+												{:else}
+													<button class="set-btn set-btn-skip-idle" onclick={() => handleSkip(set.id)} disabled={s.saving} title="Skip set">
+														<X size={13} strokeWidth={2} />
+													</button>
+													<button class="set-btn set-btn-confirm" onclick={() => handleComplete(set.id, exercise)} disabled={s.saving} title="Done — log as prescribed">
+														<Check size={16} strokeWidth={2.5} />
+													</button>
+												{/if}
+											</div>
+										</div>
+									{/if}
+								{/each}
+							</div>
+						{/if}
+					</div>
+
+					<!-- ═══ BACK FACE ═══ -->
+					<div class="card flip-back">
+						<div class="flip-back-header">
+							<ArrowLeftRight size={14} strokeWidth={2} />
+							<span>Swap {exercise.exercise_name}</span>
+							<button class="flip-back-close" onclick={() => flippedId = null} title="Cancel">
+								<X size={14} strokeWidth={2} />
+							</button>
+						</div>
+						{#each getMockAlternatives(exercise) as alt}
+							<button class="swap-alt" onclick={() => handleSwapSelect(exercise.id, alt.exercise_name)}>
+								<span class="swap-alt-name">{alt.exercise_name}</span>
+								<span class="swap-alt-meta">{alt.equipment}</span>
+							</button>
+						{/each}
+					</div>
 				</div>
 			{/each}
 		</div>
@@ -556,6 +668,8 @@
 		display: flex;
 		align-items: center;
 		gap: var(--space-3);
+		position: relative;
+		z-index: 10;
 	}
 
 	.header-icon {
@@ -734,6 +848,7 @@
 		box-shadow: var(--shadow-sm);
 		overflow: hidden;
 		transition: all var(--duration-normal) var(--ease-out);
+		touch-action: pan-y;
 	}
 
 	.card-completed {
@@ -864,6 +979,127 @@
 		padding: 0 var(--space-4) var(--space-3);
 		margin-top: calc(-1 * var(--space-2));
 	}
+
+	/* ═══ Rationale Caption ═══ */
+	.card-rationale {
+		font-size: var(--text-xs);
+		color: var(--color-text-tertiary);
+		font-style: italic;
+		padding: 0 var(--space-4) var(--space-2);
+		margin-top: calc(-1 * var(--space-2));
+		opacity: 0.7;
+	}
+
+	/* ═══ Card Flip (Swap) ═══ */
+	.flip-container {
+		perspective: 800px;
+		position: relative;
+	}
+
+	.flip-container .flip-front,
+	.flip-container .flip-back {
+		backface-visibility: hidden;
+		transition: transform 0.5s var(--ease-out);
+	}
+
+	.flip-container .flip-front {
+		transform: rotateY(0deg);
+	}
+
+	.flip-container .flip-back {
+		position: absolute;
+		inset: 0;
+		transform: rotateY(180deg);
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius);
+		box-shadow: var(--shadow-sm);
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
+	.flip-container.flipped .flip-front {
+		transform: rotateY(-180deg);
+		pointer-events: none;
+	}
+
+	.flip-container.flipped .flip-back {
+		transform: rotateY(0deg);
+	}
+
+	.flip-back-header {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		padding: var(--space-4);
+		font-family: var(--font-display);
+		font-size: var(--text-sm);
+		font-weight: var(--weight-semibold);
+		color: var(--color-rest);
+		text-transform: capitalize;
+		border-bottom: 1px dashed var(--color-border);
+	}
+
+	.flip-back-close {
+		margin-left: auto;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 26px;
+		height: 26px;
+		border: none;
+		background: transparent;
+		color: var(--color-text-tertiary);
+		cursor: pointer;
+		border-radius: var(--radius-sm);
+		transition: color var(--duration-fast);
+	}
+
+	.flip-back-close:hover {
+		color: var(--color-text);
+	}
+
+	.swap-alt {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		width: 100%;
+		padding: var(--space-3) var(--space-4);
+		background: none;
+		border: none;
+		border-top: 1px solid var(--color-border-subtle);
+		color: var(--color-text);
+		cursor: pointer;
+		transition: background var(--duration-fast);
+		text-align: left;
+	}
+
+	.swap-alt:first-of-type {
+		border-top: none;
+	}
+
+	.swap-alt:hover {
+		background: var(--color-surface-hover);
+	}
+
+	.swap-alt:active {
+		background: var(--color-surface-active);
+	}
+
+	.swap-alt-name {
+		font-family: var(--font-display);
+		font-size: var(--text-sm);
+		font-weight: var(--weight-medium);
+		text-transform: capitalize;
+	}
+
+	.swap-alt-meta {
+		font-family: var(--font-mono);
+		font-size: var(--text-xs);
+		color: var(--color-text-tertiary);
+	}
+
 
 	/* Per-exercise arc gauge */
 	.card-arc-wrap {

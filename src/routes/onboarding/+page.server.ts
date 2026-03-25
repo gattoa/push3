@@ -55,7 +55,7 @@ export const actions: Actions = {
 			return fail(400, { message: 'Invalid gender value.' });
 		}
 
-		const result = await updateUserSettings(supabase, user.id, {
+		const settingsPayload = {
 			date_of_birth,
 			gender: gender as 'male' | 'female' | 'prefer_not_to_say',
 			goals,
@@ -65,9 +65,14 @@ export const actions: Actions = {
 			training_days_per_week,
 			session_duration_minutes,
 			unit_pref
-		});
+		};
+
+		console.log('[onboarding] Saving settings for user:', user.id, JSON.stringify(settingsPayload));
+
+		const result = await updateUserSettings(supabase, user.id, settingsPayload);
 
 		if (!result) {
+			console.error('[onboarding] updateUserSettings returned null for user:', user.id);
 			return fail(500, { message: 'Failed to save settings. Please try again.' });
 		}
 

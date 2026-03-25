@@ -47,13 +47,15 @@ export async function updateUserSettings(
 ): Promise<UserSettings | null> {
 	const { data, error } = await supabase
 		.from('user_settings')
-		.update({ ...updates, updated_at: new Date().toISOString() })
-		.eq('user_id', userId)
+		.upsert(
+			{ user_id: userId, ...updates, updated_at: new Date().toISOString() },
+			{ onConflict: 'user_id' }
+		)
 		.select()
 		.single();
 
 	if (error) {
-		console.error('Failed to update user settings:', error.message);
+		console.error('Failed to upsert user settings:', error.message);
 		return null;
 	}
 	return data;
@@ -166,7 +168,9 @@ export async function savePlan(
 					exercise_id: exercise.exercise_id,
 					exercise_name: exercise.exercise_name,
 					order_index: exercise.order_index,
-					notes: exercise.notes ?? null
+					notes: exercise.notes ?? null,
+					alternatives: exercise.alternatives ?? null,
+					rationale: exercise.rationale ?? null
 				})
 				.select('id')
 				.single();
