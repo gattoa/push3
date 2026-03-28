@@ -1,7 +1,7 @@
 # Daily Workout — `/workout`
 
 > Primary screen. What users see every time they open the app. Lives within the Workout tab of the persistent two-tab bottom nav.
-> Last updated: 2026-03-24 (v0.3.0 — progressive disclosure, arc gauges, segmented progress, set interaction model, color semantics applied)
+> Last updated: 2026-03-28 (v0.4.0 — segmented tab navigation, [day] drill-down header, navigation model)
 
 ## Role
 
@@ -11,7 +11,8 @@ This is the app's home screen post-onboarding. It shows today's prescribed worko
 
 ```
 ┌─────────────────────────────────┐
-│ [≡]    Monday, Mar 24      [AG] │  ← Header: list icon (→/plan), date, avatar
+│ [   ]  [ Week | Today ]   [AG] │  ← Header: segment control, avatar
+│          Monday, Mar 24         │  ← Day + date (centered below tabs)
 │              Push                │  ← Split label
 ├─────────────────────────────────┤
 │ ┌─ Banner (conditional) ──── ×┐ │  ← Lavender (check-in) or mint (plan review)
@@ -49,18 +50,40 @@ This is the app's home screen post-onboarding. It shows today's prescribed worko
 │  │  [View Weekly Plan]        │  │
 │  └───────────────────────────┘  │
 ├─────────────────────────────────┤
-│  [ Workout ]    [ Progress ]    │  ← Persistent bottom nav
+│  [ Workout ]    [ Progress ]    │  ← Bottom nav (planned, currently hidden)
 └─────────────────────────────────┘
 ```
 
 ## Design Decisions
 
 ### Header
-- **Left:** List icon (Lucide `Menu`) — navigates to weekly agenda (`/plan`). Secondary view within the Workout tab, not a separate nav destination.
-- **Center:** Day + date (e.g., "Monday, Mar 24"), split label below (e.g., "Push")
-- **Right:** Avatar with sign-out dropdown. Shows user photo or initials.
+- **Top bar:** Three-slot layout — left action, center segmented control, right action
+- **Left slot:** Empty placeholder (reserved for future Edit button)
+- **Center:** Segmented control pill — "Week" (inactive) and "Today" (active, mint). Order reflects overview-to-detail hierarchy. Tapping "Week" navigates to `/plan`.
+- **Right:** Avatar with sign-out dropdown. Shows Google OAuth photo or initials.
+- **Below tabs:** Day + date (e.g., "Monday, Mar 24") and split label (e.g., "Push"), centered
 - No week number — internal concept, not user-facing
 - No back button — this is home
+
+### `/workout/[day]` Header (Drill-Down Variant)
+When viewing a specific day via the weekly agenda:
+- **Left slot:** Back arrow (Lucide `ArrowLeft`, icon-only) → navigates to `/plan`
+- **Center:** Segmented control with "Week" active (you're viewing a day within the week context)
+- **Right slot:** Empty placeholder (reserved for future Edit button)
+- **Below tabs:** Day name and split label, centered
+- The segmented control persists on drill-down for quick lateral navigation (tap "Today" to jump to today's workout)
+
+### Navigation Model
+| View | Left | Center | Right | Below |
+|---|---|---|---|---|
+| `/workout` | *empty (Edit planned)* | Week · **[Today]** | Avatar | Day + date, split |
+| `/plan` | *empty (Edit planned)* | **[Week]** · Today | Avatar | "This Week" |
+| `/workout/[day]` | ← Back → `/plan` | **[Week]** · Today | *empty (Edit planned)* | Day name, split |
+
+- Segmented "Today" always → `/workout`
+- Segmented "Week" always → `/plan`
+- Bottom nav "Workout" tab always → `/workout` (today)
+- Back arrow on `[day]` → `/plan` (return to week overview)
 
 ### Banner System
 - A single banner slot sits above the progress bar. At most one banner at a time.
@@ -240,9 +263,11 @@ Inputs appear as **plain inline text** at rest — no visible borders or backgro
 - [x] ~~Exercise card expand/collapse — all open by default, or collapse completed ones?~~ — Progressive disclosure: only active exercise expanded. Completed collapse and dim. Upcoming collapse at reduced opacity.
 - [ ] Pull-to-refresh behavior?
 - [ ] Rest timer between sets?
+- [ ] Edit button — planned for left slot (primary views) / right slot (drill-down). Allows reordering exercises or days depending on active view. Header layout reserves empty placeholder slots for this.
 
 ## Routing
 
 - Auth guard (`hooks.server.ts`) redirects authenticated + onboarded users to `/workout`
 - `/workout` (no `[day]` param) resolves today's day index server-side
-- `/workout/[day]` still works for viewing specific days (linked from weekly agenda)
+- `/workout/[day]` loads a specific day's workout (linked from weekly agenda)
+- Navigation between `/workout` and `/plan` via segmented control (no page reload — SvelteKit client-side navigation with crossfade transition)

@@ -6,6 +6,8 @@
 	import type { FullPlanDay, FullPlanExercise, FullPlanSet, ExerciseAlternative } from '$lib/types/database';
 	import { isPR as isPRUtil } from '$lib/utils/pr';
 	import { invalidateAll } from '$app/navigation';
+	import { navigating } from '$app/stores';
+	import SegmentedControl from '$lib/components/SegmentedControl.svelte';
 
 	let { data } = $props();
 	const day = $derived(data.day as FullPlanDay);
@@ -14,6 +16,12 @@
 	const exerciseHistory = $derived(data.exerciseHistory as Record<string, { lastWeight: number; lastReps: number; bestE1RM: number }>);
 
 	const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+	// Skip pushUp animation on client-side navigation (only play on fresh/SSR load)
+	let isClientNav = $state(false);
+	$effect(() => {
+		if ($navigating) isClientNav = true;
+	});
 
 	// ── Set State ──────────────────────────────────────────────
 	let setStates = $state<Record<string, {
@@ -316,16 +324,18 @@
 
 <div class="page">
 	<!-- ═══ Header ═══ -->
-	<header class="header push-up" style="--d:0">
-		<a href="/workout" class="back-link" title="Back to today">
-			<ArrowLeft size={18} strokeWidth={2} />
-			<span>Today</span>
-		</a>
-		<div class="header-center">
+	<header class="header" class:push-up={!isClientNav} style="--d:0">
+		<div class="header-bar">
+			<a href="/plan" class="back-btn" title="Back to week">
+				<ArrowLeft size={18} strokeWidth={2} />
+			</a>
+			<SegmentedControl active="week" />
+			<div class="header-slot"></div>
+		</div>
+		<div class="header-context">
 			<h1 class="header-day">{DAY_NAMES[day.day_index]}</h1>
 			<span class="header-split">{day.split_label}</span>
 		</div>
-		<span class="header-week">Week {weekNumber}</span>
 	</header>
 
 	{#if day.exercises.length === 0}
@@ -646,32 +656,41 @@
 	/* ═══ Header ═══ */
 	.header {
 		display: flex;
-		align-items: center;
-		gap: var(--space-3);
+		flex-direction: column;
+		gap: var(--space-2);
 	}
 
-	.back-link {
+	.header-bar {
 		display: flex;
 		align-items: center;
-		gap: var(--space-1);
-		color: var(--color-text-secondary);
-		text-decoration: none;
-		font-size: var(--text-sm);
-		font-weight: var(--weight-medium);
-		padding: var(--space-2);
-		margin: calc(-1 * var(--space-2));
-		border-radius: var(--radius-sm);
-		transition: color var(--duration-fast);
-		flex-shrink: 0;
+		justify-content: space-between;
 	}
 
-	.back-link:hover {
+	.back-btn {
+		width: 40px;
+		height: 40px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--color-text-secondary);
+		text-decoration: none;
+		border-radius: var(--radius);
+		transition: color var(--duration-fast);
+		flex-shrink: 0;
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	.back-btn:hover {
 		color: var(--color-text);
 	}
 
-	.header-center {
-		flex: 1;
-		min-width: 0;
+	.header-slot {
+		width: 40px;
+		height: 40px;
+		flex-shrink: 0;
+	}
+
+	.header-context {
 		text-align: center;
 	}
 
@@ -687,14 +706,6 @@
 		font-size: var(--text-sm);
 		color: var(--color-text-secondary);
 		text-transform: capitalize;
-	}
-
-	.header-week {
-		font-family: var(--font-mono);
-		font-size: var(--text-xs);
-		color: var(--color-text-tertiary);
-		font-weight: var(--weight-bold);
-		flex-shrink: 0;
 	}
 
 	/* ═══ Rest State ═══ */

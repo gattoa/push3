@@ -1,6 +1,8 @@
 # Progress — `/progress`
 
-> The athlete's command center. History, stats, personal records, and settings. Second tab in persistent bottom nav.
+> **Status: Planned (placeholder only).** The current implementation is a skeleton page with placeholder text. This spec describes the target design. Bottom nav is hidden until this page is built.
+
+> The athlete's command center. History, stats, personal records, and settings. Second tab in bottom nav.
 
 ## Role
 

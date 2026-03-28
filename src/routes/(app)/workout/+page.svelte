@@ -1,14 +1,16 @@
 <script lang="ts">
 	import {
-		Check, X, Menu, Trophy,
+		Check, X, Trophy,
 		ChevronDown, TrendingUp, Flame, Dumbbell, Eye, ArrowLeftRight
 	} from 'lucide-svelte';
+	import SegmentedControl from '$lib/components/SegmentedControl.svelte';
 	import type { FullPlanDay, FullPlanExercise, FullPlanSet } from '$lib/types/database';
 	import { isPR as isPRUtil } from '$lib/utils/pr';
 	import { shouldShowBanner, dismissBanner } from '$lib/utils/banner';
 	import Banner from '$lib/components/Banner.svelte';
 	import { page } from '$app/state';
 	import { goto, invalidateAll } from '$app/navigation';
+	import { navigating } from '$app/stores';
 	import type { ExerciseAlternative } from '$lib/types/database';
 
 	let { data } = $props();
@@ -17,6 +19,12 @@
 	const unitPref = $derived(data.unitPref as string);
 	const exerciseHistory = $derived(data.exerciseHistory as Record<string, { lastWeight: number; lastReps: number; bestE1RM: number }>);
 	const initialBanner = $derived(data.banner as 'check-in' | 'plan-review' | null);
+
+	// Skip pushUp animation on client-side navigation (only play on fresh/SSR load)
+	let isClientNav = $state(false);
+	$effect(() => {
+		if ($navigating) isClientNav = true;
+	});
 
 	// Avatar menu
 	let showMenu = $state(false);
@@ -348,28 +356,29 @@
 
 <div class="page">
 	<!-- ═══ Header ═══ -->
-	<header class="header push-up" style="--d:0">
-		<a href="/plan" class="header-icon" title="Weekly agenda">
-			<Menu size={20} strokeWidth={2} />
-		</a>
-		<div class="header-center">
+	<header class="header" class:push-up={!isClientNav} style="--d:0">
+		<div class="header-bar">
+			<div class="header-slot"></div>
+			<SegmentedControl active="today" />
+			<div class="avatar-wrapper">
+				<button class="header-icon avatar" onclick={() => showMenu = !showMenu} title="Account">
+					{#if avatarUrl}
+						<img src={avatarUrl} alt="Avatar" class="avatar-img" referrerpolicy="no-referrer" />
+					{:else}
+						<span class="avatar-initials">{initials}</span>
+					{/if}
+				</button>
+				{#if showMenu}
+					<div class="avatar-menu">
+						<div class="menu-user">{user?.user_metadata?.full_name ?? user?.email ?? ''}</div>
+						<button class="menu-item" onclick={signOut}>Sign Out</button>
+					</div>
+				{/if}
+			</div>
+		</div>
+		<div class="header-context">
 			<h1 class="header-day">{DAY_NAMES[dayIndex]}, {todayDate}</h1>
 			<span class="header-split">{day.split_label}</span>
-		</div>
-		<div class="avatar-wrapper">
-			<button class="header-icon avatar" onclick={() => showMenu = !showMenu} title="Account">
-				{#if avatarUrl}
-					<img src={avatarUrl} alt="Avatar" class="avatar-img" referrerpolicy="no-referrer" />
-				{:else}
-					<span class="avatar-initials">{initials}</span>
-				{/if}
-			</button>
-			{#if showMenu}
-				<div class="avatar-menu">
-					<div class="menu-user">{user?.user_metadata?.full_name ?? user?.email ?? ''}</div>
-					<button class="menu-item" onclick={signOut}>Sign Out</button>
-				</div>
-			{/if}
 		</div>
 	</header>
 
@@ -707,10 +716,26 @@
 	/* ═══ Header ═══ */
 	.header {
 		display: flex;
-		align-items: center;
-		gap: var(--space-3);
+		flex-direction: column;
+		gap: var(--space-2);
 		position: relative;
 		z-index: 10;
+	}
+
+	.header-bar {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.header-slot {
+		width: 40px;
+		height: 40px;
+		flex-shrink: 0;
+	}
+
+	.header-context {
+		text-align: center;
 	}
 
 	.header-icon {
@@ -796,12 +821,6 @@
 
 	.menu-item:hover {
 		background: rgba(255, 255, 255, 0.05);
-	}
-
-	.header-center {
-		flex: 1;
-		min-width: 0;
-		text-align: center;
 	}
 
 	.header-day {

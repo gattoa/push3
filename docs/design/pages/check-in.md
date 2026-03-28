@@ -1,6 +1,8 @@
 # Weekly Check-In — `/check-in`
 
 > End-of-week form. Closes the feedback loop between logging and re-generation.
+>
+> **Future direction:** The current page-based approach (`/check-in` route) will be replaced by a **full-screen modal** triggered from the workout view. Check-in is a lightweight secondary task — a modal preserves workout context without a URL change or page navigation. Photo upload is unaffected (OS-level picker layers above modals). The current page implementation remains functional until the modal is built.
 
 ## Role
 
