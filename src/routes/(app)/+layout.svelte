@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { fade } from 'svelte/transition';
+	import Toast from '$lib/components/Toast.svelte';
 
 	let { children } = $props();
 </script>
@@ -16,6 +17,7 @@
 	<!-- BottomNav hidden until Progress page is designed -->
 	<!-- <BottomNav /> -->
 </div>
+<Toast />
 
 <style>
 	.app-shell {

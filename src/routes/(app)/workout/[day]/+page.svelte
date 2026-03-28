@@ -8,6 +8,8 @@
 	import { invalidateAll } from '$app/navigation';
 	import { navigating } from '$app/stores';
 	import SegmentedControl from '$lib/components/SegmentedControl.svelte';
+	import { saveDrafts, loadDrafts, clearDraft } from '$lib/utils/set-draft';
+	import { addToast } from '$lib/stores/toast.svelte';
 
 	let { data } = $props();
 	const day = $derived(data.day as FullPlanDay);
@@ -33,11 +35,24 @@
 	}>>({});
 
 	$effect(() => {
-		const initial: typeof setStates = {};
+		const drafts = loadDrafts();
+		const updated: typeof setStates = {};
 		for (const exercise of day.exercises) {
 			for (const set of exercise.sets) {
 				const log = set.log;
-				initial[set.id] = {
+				const draft = drafts[set.id];
+				// Restore draft for pending sets that have local edits
+				if ((!log?.status || log.status === 'pending') && draft && (draft.weight || draft.reps)) {
+					updated[set.id] = {
+						weight: draft.weight,
+						reps: draft.reps,
+						status: 'pending',
+						saving: false,
+						logId: log?.id ?? null
+					};
+					continue;
+				}
+				updated[set.id] = {
 					weight: log?.actual_weight?.toString() ?? '',
 					reps: log?.actual_reps?.toString() ?? '',
 					status: (log?.status as 'pending' | 'completed' | 'skipped') ?? 'pending',
@@ -46,7 +61,12 @@
 				};
 			}
 		}
-		setStates = initial;
+		setStates = updated;
+	});
+
+	// Persist pending drafts to localStorage on every state change
+	$effect(() => {
+		saveDrafts(setStates);
 	});
 
 	// ── Derived Stats ──────────────────────────────────────────
@@ -159,7 +179,10 @@
 
 	function handlePointerDown(e: PointerEvent, exerciseId: string) {
 		if (flippedId && flippedId !== exerciseId) return;
-		e.preventDefault(); // prevent text selection during drag
+		// Allow inputs/buttons to receive focus — only prevent default for swipe gestures
+		const tag = (e.target as HTMLElement).tagName;
+		if (tag === 'INPUT' || tag === 'BUTTON') return;
+		e.preventDefault();
 		swipingId = exerciseId;
 		swipeStartX = e.clientX;
 		swipeStartY = e.clientY;
@@ -279,21 +302,24 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					planned_set_id: setId,
-					actual_weight: fresh.weight ? parseFloat(fresh.weight) : null,
-					actual_reps: fresh.reps ? parseInt(fresh.reps, 10) : null,
+					actual_weight: fresh.weight !== '' ? parseFloat(fresh.weight) : null,
+					actual_reps: fresh.reps !== '' ? parseInt(fresh.reps, 10) : null,
 					status
 				})
 			});
 
 			const result = await res.json();
 			if (res.ok) {
+				clearDraft(setId);
 				setStates[setId] = { ...setStates[setId], saving: false, logId: result.id };
 			} else {
 				console.error('Failed to save set:', result.error);
+				addToast('Set didn\u2019t save \u2014 try again');
 				setStates[setId] = { ...setStates[setId], saving: false, status: s.status };
 			}
 		} catch (e) {
 			console.error('Network error saving set:', e);
+			addToast('Network error \u2014 check your connection');
 			setStates[setId] = { ...setStates[setId], saving: false, status: s.status };
 		}
 	}
