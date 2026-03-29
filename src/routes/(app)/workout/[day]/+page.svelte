@@ -277,10 +277,13 @@
 			});
 			if (res.ok) {
 				flippedId = null;
+				delete alternativesCache[exerciseId];
 				await invalidateAll();
+				addToast(`Swapped to ${alt.exercise_name}`, 'success');
 			} else {
 				const { error } = await res.json();
 				console.error('[swap] Failed:', error);
+				addToast('Swap failed — try again', 'error');
 			}
 		} finally {
 			swappingId = null;
@@ -391,7 +394,7 @@
 
 		<!-- ═══ Exercise Cards ═══ -->
 		<div class="exercises">
-			{#each day.exercises.slice().sort((a, b) => a.order_index - b.order_index) as exercise, i}
+			{#each day.exercises.slice().sort((a, b) => a.order_index - b.order_index) as exercise, i (exercise.exercise_id)}
 				{@const prog = exerciseProgress(exercise)}
 				{@const exState = getExerciseState(exercise, i)}
 				{@const isExpanded = expandedExercise === exercise.id}
@@ -585,7 +588,7 @@
 							{#each getAlternatives(exercise) ?? [] as alt}
 								<button class="swap-alt" onpointerdown={(e) => e.stopPropagation()} onclick={() => handleSwapSelect(exercise.id, alt)} disabled={swappingId === exercise.id}>
 									<span class="swap-alt-name">{alt.exercise_name}</span>
-									<span class="swap-alt-meta">{alt.equipment}</span>
+									{#if alt.equipment}<span class="swap-alt-meta">{alt.equipment}</span>{/if}
 								</button>
 							{/each}
 						{:else}

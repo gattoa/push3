@@ -16,7 +16,8 @@ import type {
 	PlannedSetInsert,
 	SetLogInsert,
 	SetLogUpdate,
-	CheckInInsert
+	CheckInInsert,
+	ExerciseAlternative
 } from '$lib/types/database';
 
 // ============================================================================
@@ -273,7 +274,32 @@ export async function swapExercise(
 	newExerciseId: string,
 	newExerciseName: string
 ): Promise<{ success: true } | { success: false; error: string }> {
-	// 1. Get planned_sets IDs for this exercise
+	// 1. Read current exercise row to preserve alternatives
+	const { data: currentExercise, error: exerciseQueryError } = await supabase
+		.from('planned_exercises')
+		.select('exercise_id, exercise_name, alternatives')
+		.eq('id', plannedExerciseId)
+		.single();
+
+	if (exerciseQueryError || !currentExercise) {
+		console.error('Failed to query planned exercise:', exerciseQueryError?.message);
+		return { success: false, error: exerciseQueryError?.message ?? 'Exercise not found' };
+	}
+
+	// Build rotated alternatives: original exercise replaces the picked one
+	const originalAsAlt: ExerciseAlternative = {
+		exercise_id: currentExercise.exercise_id,
+		exercise_name: currentExercise.exercise_name,
+		body_part: '',
+		target: '',
+		equipment: ''
+	};
+	const remaining = ((currentExercise.alternatives as ExerciseAlternative[] | null) ?? []).filter(
+		(a) => a.exercise_id !== newExerciseId
+	);
+	const rotatedAlternatives = [originalAsAlt, ...remaining];
+
+	// 2. Get planned_sets IDs for this exercise
 	const { data: sets, error: setsQueryError } = await supabase
 		.from('planned_sets')
 		.select('id')
@@ -286,7 +312,7 @@ export async function swapExercise(
 
 	const setIds = (sets ?? []).map((s) => s.id);
 
-	// 2. Delete set_logs for those planned_sets
+	// 3. Delete set_logs for those planned_sets
 	if (setIds.length > 0) {
 		const { error: logsDeleteError } = await supabase
 			.from('set_logs')
@@ -299,7 +325,7 @@ export async function swapExercise(
 		}
 	}
 
-	// 3. Delete planned_sets for this exercise
+	// 4. Delete planned_sets for this exercise
 	const { error: setsDeleteError } = await supabase
 		.from('planned_sets')
 		.delete()
@@ -310,7 +336,7 @@ export async function swapExercise(
 		return { success: false, error: setsDeleteError.message };
 	}
 
-	// 4. Update planned_exercises row
+	// 5. Update planned_exercises row
 	const { error: updateError } = await supabase
 		.from('planned_exercises')
 		.update({
@@ -318,7 +344,7 @@ export async function swapExercise(
 			exercise_name: newExerciseName,
 			notes: null,
 			rationale: null,
-			alternatives: null
+			alternatives: rotatedAlternatives
 		})
 		.eq('id', plannedExerciseId);
 
@@ -327,7 +353,7 @@ export async function swapExercise(
 		return { success: false, error: updateError.message };
 	}
 
-	// 5. Insert 3 fresh default planned_sets
+	// 6. Insert 3 fresh default planned_sets
 	const { error: insertError } = await supabase.from('planned_sets').insert([
 		{ planned_exercise_id: plannedExerciseId, set_number: 1, target_reps: 10, target_weight: null },
 		{ planned_exercise_id: plannedExerciseId, set_number: 2, target_reps: 10, target_weight: null },
