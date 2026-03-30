@@ -272,7 +272,8 @@ export async function swapExercise(
 	supabase: SupabaseClient,
 	plannedExerciseId: string,
 	newExerciseId: string,
-	newExerciseName: string
+	newExerciseName: string,
+	userId: string
 ): Promise<{ success: true } | { success: false; error: string }> {
 	// 1. Read current exercise row to preserve alternatives
 	const { data: currentExercise, error: exerciseQueryError } = await supabase
@@ -299,11 +300,12 @@ export async function swapExercise(
 	);
 	const rotatedAlternatives = [originalAsAlt, ...remaining];
 
-	// 2. Get planned_sets IDs for this exercise
+	// 2. Read existing planned_sets (preserve rep scheme for the new exercise)
 	const { data: sets, error: setsQueryError } = await supabase
 		.from('planned_sets')
-		.select('id')
-		.eq('planned_exercise_id', plannedExerciseId);
+		.select('id, set_number, target_reps, target_weight')
+		.eq('planned_exercise_id', plannedExerciseId)
+		.order('set_number');
 
 	if (setsQueryError) {
 		console.error('Failed to query planned sets:', setsQueryError.message);
@@ -311,6 +313,10 @@ export async function swapExercise(
 	}
 
 	const setIds = (sets ?? []).map((s) => s.id);
+
+	// Look up user's history with the NEW exercise for weight carryover
+	const history = await getExerciseHistory(supabase, userId, [newExerciseId]);
+	const lastWeight = history[newExerciseId]?.last_weight ?? null;
 
 	// 3. Delete set_logs for those planned_sets
 	if (setIds.length > 0) {
@@ -353,12 +359,25 @@ export async function swapExercise(
 		return { success: false, error: updateError.message };
 	}
 
-	// 6. Insert 3 fresh default planned_sets
-	const { error: insertError } = await supabase.from('planned_sets').insert([
-		{ planned_exercise_id: plannedExerciseId, set_number: 1, target_reps: 10, target_weight: null },
-		{ planned_exercise_id: plannedExerciseId, set_number: 2, target_reps: 10, target_weight: null },
-		{ planned_exercise_id: plannedExerciseId, set_number: 3, target_reps: 10, target_weight: null }
-	]);
+	// 6. Re-insert planned_sets preserving the original rep scheme
+	//    - Reps carry over (they reflect training intent, not the exercise)
+	//    - Weight uses user's last logged weight for the new exercise (if history exists)
+	const originalSets = sets ?? [];
+	const newSets =
+		originalSets.length > 0
+			? originalSets.map((s) => ({
+					planned_exercise_id: plannedExerciseId,
+					set_number: s.set_number,
+					target_reps: s.target_reps,
+					target_weight: lastWeight
+				}))
+			: [
+					{ planned_exercise_id: plannedExerciseId, set_number: 1, target_reps: 10, target_weight: null },
+					{ planned_exercise_id: plannedExerciseId, set_number: 2, target_reps: 10, target_weight: null },
+					{ planned_exercise_id: plannedExerciseId, set_number: 3, target_reps: 10, target_weight: null }
+				];
+
+	const { error: insertError } = await supabase.from('planned_sets').insert(newSets);
 
 	if (insertError) {
 		console.error('Failed to insert default sets:', insertError.message);

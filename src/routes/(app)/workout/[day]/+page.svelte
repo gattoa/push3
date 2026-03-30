@@ -12,7 +12,8 @@
 	import { addToast } from '$lib/stores/toast.svelte';
 
 	let { data } = $props();
-	const day = $derived(data.day as FullPlanDay);
+	let day = $state<FullPlanDay>(data.day as FullPlanDay);
+	$effect(() => { day = data.day as FullPlanDay; });
 	const unitPref = $derived(data.unitPref as string);
 	const weekNumber = $derived(data.plan.week_number as number);
 	const exerciseHistory = $derived(data.exerciseHistory as Record<string, { lastWeight: number; lastReps: number; bestE1RM: number }>);

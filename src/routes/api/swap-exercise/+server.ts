@@ -35,7 +35,7 @@ export const POST: RequestHandler = async ({ request, locals: { safeGetSession, 
 		return json({ error: 'Forbidden' }, { status: 403 });
 	}
 
-	const result = await swapExercise(supabase, planned_exercise_id, new_exercise_id, new_exercise_name);
+	const result = await swapExercise(supabase, planned_exercise_id, new_exercise_id, new_exercise_name, user.id);
 
 	if (!result.success) {
 		return json({ error: result.error }, { status: 500 });
