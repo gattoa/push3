@@ -16,7 +16,8 @@ import type {
 	PlannedSetInsert,
 	SetLogInsert,
 	SetLogUpdate,
-	CheckInInsert
+	CheckInInsert,
+	ExerciseAlternative
 } from '$lib/types/database';
 
 // ============================================================================
@@ -271,13 +272,40 @@ export async function swapExercise(
 	supabase: SupabaseClient,
 	plannedExerciseId: string,
 	newExerciseId: string,
-	newExerciseName: string
+	newExerciseName: string,
+	userId: string
 ): Promise<{ success: true } | { success: false; error: string }> {
-	// 1. Get planned_sets IDs for this exercise
+	// 1. Read current exercise row to preserve alternatives
+	const { data: currentExercise, error: exerciseQueryError } = await supabase
+		.from('planned_exercises')
+		.select('exercise_id, exercise_name, alternatives')
+		.eq('id', plannedExerciseId)
+		.single();
+
+	if (exerciseQueryError || !currentExercise) {
+		console.error('Failed to query planned exercise:', exerciseQueryError?.message);
+		return { success: false, error: exerciseQueryError?.message ?? 'Exercise not found' };
+	}
+
+	// Build rotated alternatives: original exercise replaces the picked one
+	const originalAsAlt: ExerciseAlternative = {
+		exercise_id: currentExercise.exercise_id,
+		exercise_name: currentExercise.exercise_name,
+		body_part: '',
+		target: '',
+		equipment: ''
+	};
+	const remaining = ((currentExercise.alternatives as ExerciseAlternative[] | null) ?? []).filter(
+		(a) => a.exercise_id !== newExerciseId
+	);
+	const rotatedAlternatives = [originalAsAlt, ...remaining];
+
+	// 2. Read existing planned_sets (preserve rep scheme for the new exercise)
 	const { data: sets, error: setsQueryError } = await supabase
 		.from('planned_sets')
-		.select('id')
-		.eq('planned_exercise_id', plannedExerciseId);
+		.select('id, set_number, target_reps, target_weight')
+		.eq('planned_exercise_id', plannedExerciseId)
+		.order('set_number');
 
 	if (setsQueryError) {
 		console.error('Failed to query planned sets:', setsQueryError.message);
@@ -286,7 +314,11 @@ export async function swapExercise(
 
 	const setIds = (sets ?? []).map((s) => s.id);
 
-	// 2. Delete set_logs for those planned_sets
+	// Look up user's history with the NEW exercise for weight carryover
+	const history = await getExerciseHistory(supabase, userId, [newExerciseId]);
+	const lastWeight = history[newExerciseId]?.last_weight ?? null;
+
+	// 3. Delete set_logs for those planned_sets
 	if (setIds.length > 0) {
 		const { error: logsDeleteError } = await supabase
 			.from('set_logs')
@@ -299,7 +331,7 @@ export async function swapExercise(
 		}
 	}
 
-	// 3. Delete planned_sets for this exercise
+	// 4. Delete planned_sets for this exercise
 	const { error: setsDeleteError } = await supabase
 		.from('planned_sets')
 		.delete()
@@ -310,7 +342,7 @@ export async function swapExercise(
 		return { success: false, error: setsDeleteError.message };
 	}
 
-	// 4. Update planned_exercises row
+	// 5. Update planned_exercises row
 	const { error: updateError } = await supabase
 		.from('planned_exercises')
 		.update({
@@ -318,7 +350,7 @@ export async function swapExercise(
 			exercise_name: newExerciseName,
 			notes: null,
 			rationale: null,
-			alternatives: null
+			alternatives: rotatedAlternatives
 		})
 		.eq('id', plannedExerciseId);
 
@@ -327,12 +359,25 @@ export async function swapExercise(
 		return { success: false, error: updateError.message };
 	}
 
-	// 5. Insert 3 fresh default planned_sets
-	const { error: insertError } = await supabase.from('planned_sets').insert([
-		{ planned_exercise_id: plannedExerciseId, set_number: 1, target_reps: 10, target_weight: null },
-		{ planned_exercise_id: plannedExerciseId, set_number: 2, target_reps: 10, target_weight: null },
-		{ planned_exercise_id: plannedExerciseId, set_number: 3, target_reps: 10, target_weight: null }
-	]);
+	// 6. Re-insert planned_sets preserving the original rep scheme
+	//    - Reps carry over (they reflect training intent, not the exercise)
+	//    - Weight uses user's last logged weight for the new exercise (if history exists)
+	const originalSets = sets ?? [];
+	const newSets =
+		originalSets.length > 0
+			? originalSets.map((s) => ({
+					planned_exercise_id: plannedExerciseId,
+					set_number: s.set_number,
+					target_reps: s.target_reps,
+					target_weight: lastWeight
+				}))
+			: [
+					{ planned_exercise_id: plannedExerciseId, set_number: 1, target_reps: 10, target_weight: null },
+					{ planned_exercise_id: plannedExerciseId, set_number: 2, target_reps: 10, target_weight: null },
+					{ planned_exercise_id: plannedExerciseId, set_number: 3, target_reps: 10, target_weight: null }
+				];
+
+	const { error: insertError } = await supabase.from('planned_sets').insert(newSets);
 
 	if (insertError) {
 		console.error('Failed to insert default sets:', insertError.message);

@@ -1,5 +1,7 @@
 <script lang="ts">
 	import type { FullPlan, FullPlanDay } from '$lib/types/database';
+	import SegmentedControl from '$lib/components/SegmentedControl.svelte';
+	import { page } from '$app/state';
 
 	let { data } = $props();
 	const plan = $derived(data.fullPlan as FullPlan);
@@ -24,6 +26,22 @@
 		}
 		return { done, total };
 	}
+
+	// Avatar
+	let showMenu = $state(false);
+	const user = $derived(page.data.user);
+	const initials = $derived(
+		user?.user_metadata?.full_name
+			? user.user_metadata.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
+			: user?.email?.[0]?.toUpperCase() ?? '?'
+	);
+	const avatarUrl = $derived(user?.user_metadata?.avatar_url ?? null);
+
+	async function signOut() {
+		showMenu = false;
+		await page.data.supabase?.auth.signOut();
+		window.location.href = '/';
+	}
 </script>
 
 <svelte:head>
@@ -32,9 +50,26 @@
 
 <div class="agenda-page">
 	<header class="agenda-header">
-		<a href="/workout" class="back-link">&larr; Today</a>
-		<h1>This Week</h1>
-		<a href="/check-in" class="checkin-link">Check-In &rarr;</a>
+		<div class="header-bar">
+			<div class="header-slot"></div>
+			<SegmentedControl active="week" />
+			<div class="avatar-wrapper">
+				<button class="header-icon avatar" onclick={() => showMenu = !showMenu} title="Account">
+					{#if avatarUrl}
+						<img src={avatarUrl} alt="Avatar" class="avatar-img" referrerpolicy="no-referrer" />
+					{:else}
+						<span class="avatar-initials">{initials}</span>
+					{/if}
+				</button>
+				{#if showMenu}
+					<div class="avatar-menu">
+						<div class="menu-user">{user?.user_metadata?.full_name ?? user?.email ?? ''}</div>
+						<button class="menu-item" onclick={signOut}>Sign Out</button>
+					</div>
+				{/if}
+			</div>
+		</div>
+		<h1 class="header-title">This Week</h1>
 	</header>
 
 	<div class="day-list">
@@ -100,39 +135,113 @@
 
 	.agenda-header {
 		display: flex;
-		align-items: baseline;
-		justify-content: space-between;
+		flex-direction: column;
+		gap: var(--space-2);
 		margin-bottom: 1.25rem;
 	}
 
-	.back-link {
-		color: var(--color-text-muted);
-		text-decoration: none;
-		font-size: 0.85rem;
-		font-weight: 500;
-		transition: color 0.15s ease;
+	.header-bar {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
 	}
 
-	.back-link:hover {
-		color: var(--color-text);
+	.header-slot {
+		width: 40px;
+		height: 40px;
+		flex-shrink: 0;
 	}
 
-	.agenda-header h1 {
+	.header-title {
 		font-family: var(--font-display);
 		font-size: 1.25rem;
 		font-weight: 700;
+		text-align: center;
 	}
 
-	.checkin-link {
-		color: var(--color-accent);
-		text-decoration: none;
+	/* Avatar */
+	.header-icon {
+		width: 40px;
+		height: 40px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius);
+		color: var(--color-text-secondary);
+		cursor: pointer;
+		transition: all var(--duration-normal) var(--ease-out);
+		flex-shrink: 0;
+	}
+
+	.header-icon:hover {
+		border-color: var(--color-border-strong);
+		color: var(--color-text);
+	}
+
+	.header-icon.avatar {
+		border-radius: var(--radius-full);
+		padding: 0;
+		overflow: hidden;
+	}
+
+	.avatar-img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+
+	.avatar-initials {
+		font-family: var(--font-display);
+		font-size: 0.7rem;
+		font-weight: 700;
+		color: var(--color-text-secondary);
+	}
+
+	.avatar-wrapper {
+		position: relative;
+	}
+
+	.avatar-menu {
+		position: absolute;
+		top: calc(100% + 6px);
+		right: 0;
+		min-width: 180px;
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+		z-index: 100;
+		overflow: hidden;
+	}
+
+	.menu-user {
+		padding: 0.75rem 1rem;
+		font-size: 0.75rem;
+		color: var(--color-text-secondary);
+		border-bottom: 1px solid var(--color-border);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.menu-item {
+		display: block;
+		width: 100%;
+		padding: 0.65rem 1rem;
+		background: none;
+		border: none;
+		color: var(--color-text);
+		font-family: var(--font-body);
 		font-size: 0.85rem;
-		font-weight: 600;
-		transition: opacity 0.15s ease;
+		text-align: left;
+		cursor: pointer;
+		transition: background 0.1s ease;
 	}
 
-	.checkin-link:hover {
-		opacity: 0.8;
+	.menu-item:hover {
+		background: rgba(255, 255, 255, 0.05);
 	}
 
 	/* Day cards */

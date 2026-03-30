@@ -6,14 +6,25 @@
 	import type { FullPlanDay, FullPlanExercise, FullPlanSet, ExerciseAlternative } from '$lib/types/database';
 	import { isPR as isPRUtil } from '$lib/utils/pr';
 	import { invalidateAll } from '$app/navigation';
+	import { navigating } from '$app/stores';
+	import SegmentedControl from '$lib/components/SegmentedControl.svelte';
+	import { saveDrafts, loadDrafts, clearDraft } from '$lib/utils/set-draft';
+	import { addToast } from '$lib/stores/toast.svelte';
 
 	let { data } = $props();
-	const day = $derived(data.day as FullPlanDay);
+	let day = $state<FullPlanDay>(data.day as FullPlanDay);
+	$effect(() => { day = data.day as FullPlanDay; });
 	const unitPref = $derived(data.unitPref as string);
 	const weekNumber = $derived(data.plan.week_number as number);
 	const exerciseHistory = $derived(data.exerciseHistory as Record<string, { lastWeight: number; lastReps: number; bestE1RM: number }>);
 
 	const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+	// Skip pushUp animation on client-side navigation (only play on fresh/SSR load)
+	let isClientNav = $state(false);
+	$effect(() => {
+		if ($navigating) isClientNav = true;
+	});
 
 	// ── Set State ──────────────────────────────────────────────
 	let setStates = $state<Record<string, {
@@ -25,11 +36,24 @@
 	}>>({});
 
 	$effect(() => {
-		const initial: typeof setStates = {};
+		const drafts = loadDrafts();
+		const updated: typeof setStates = {};
 		for (const exercise of day.exercises) {
 			for (const set of exercise.sets) {
 				const log = set.log;
-				initial[set.id] = {
+				const draft = drafts[set.id];
+				// Restore draft for pending sets that have local edits
+				if ((!log?.status || log.status === 'pending') && draft && (draft.weight || draft.reps)) {
+					updated[set.id] = {
+						weight: draft.weight,
+						reps: draft.reps,
+						status: 'pending',
+						saving: false,
+						logId: log?.id ?? null
+					};
+					continue;
+				}
+				updated[set.id] = {
 					weight: log?.actual_weight?.toString() ?? '',
 					reps: log?.actual_reps?.toString() ?? '',
 					status: (log?.status as 'pending' | 'completed' | 'skipped') ?? 'pending',
@@ -38,7 +62,12 @@
 				};
 			}
 		}
-		setStates = initial;
+		setStates = updated;
+	});
+
+	// Persist pending drafts to localStorage on every state change
+	$effect(() => {
+		saveDrafts(setStates);
 	});
 
 	// ── Derived Stats ──────────────────────────────────────────
@@ -151,7 +180,10 @@
 
 	function handlePointerDown(e: PointerEvent, exerciseId: string) {
 		if (flippedId && flippedId !== exerciseId) return;
-		e.preventDefault(); // prevent text selection during drag
+		// Allow inputs/buttons to receive focus — only prevent default for swipe gestures
+		const tag = (e.target as HTMLElement).tagName;
+		if (tag === 'INPUT' || tag === 'BUTTON') return;
+		e.preventDefault();
 		swipingId = exerciseId;
 		swipeStartX = e.clientX;
 		swipeStartY = e.clientY;
@@ -246,10 +278,13 @@
 			});
 			if (res.ok) {
 				flippedId = null;
+				delete alternativesCache[exerciseId];
 				await invalidateAll();
+				addToast(`Swapped to ${alt.exercise_name}`, 'success');
 			} else {
 				const { error } = await res.json();
 				console.error('[swap] Failed:', error);
+				addToast('Swap failed — try again', 'error');
 			}
 		} finally {
 			swappingId = null;
@@ -271,21 +306,24 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					planned_set_id: setId,
-					actual_weight: fresh.weight ? parseFloat(fresh.weight) : null,
-					actual_reps: fresh.reps ? parseInt(fresh.reps, 10) : null,
+					actual_weight: fresh.weight !== '' ? parseFloat(fresh.weight) : null,
+					actual_reps: fresh.reps !== '' ? parseInt(fresh.reps, 10) : null,
 					status
 				})
 			});
 
 			const result = await res.json();
 			if (res.ok) {
+				clearDraft(setId);
 				setStates[setId] = { ...setStates[setId], saving: false, logId: result.id };
 			} else {
 				console.error('Failed to save set:', result.error);
+				addToast('Set didn\u2019t save \u2014 try again');
 				setStates[setId] = { ...setStates[setId], saving: false, status: s.status };
 			}
 		} catch (e) {
 			console.error('Network error saving set:', e);
+			addToast('Network error \u2014 check your connection');
 			setStates[setId] = { ...setStates[setId], saving: false, status: s.status };
 		}
 	}
@@ -316,16 +354,18 @@
 
 <div class="page">
 	<!-- ═══ Header ═══ -->
-	<header class="header push-up" style="--d:0">
-		<a href="/workout" class="back-link" title="Back to today">
-			<ArrowLeft size={18} strokeWidth={2} />
-			<span>Today</span>
-		</a>
-		<div class="header-center">
+	<header class="header" class:push-up={!isClientNav} style="--d:0">
+		<div class="header-bar">
+			<a href="/plan" class="back-btn" title="Back to week">
+				<ArrowLeft size={18} strokeWidth={2} />
+			</a>
+			<SegmentedControl active="week" />
+			<div class="header-slot"></div>
+		</div>
+		<div class="header-context">
 			<h1 class="header-day">{DAY_NAMES[day.day_index]}</h1>
 			<span class="header-split">{day.split_label}</span>
 		</div>
-		<span class="header-week">Week {weekNumber}</span>
 	</header>
 
 	{#if day.exercises.length === 0}
@@ -355,7 +395,7 @@
 
 		<!-- ═══ Exercise Cards ═══ -->
 		<div class="exercises">
-			{#each day.exercises.slice().sort((a, b) => a.order_index - b.order_index) as exercise, i}
+			{#each day.exercises.slice().sort((a, b) => a.order_index - b.order_index) as exercise, i (exercise.exercise_id)}
 				{@const prog = exerciseProgress(exercise)}
 				{@const exState = getExerciseState(exercise, i)}
 				{@const isExpanded = expandedExercise === exercise.id}
@@ -549,7 +589,7 @@
 							{#each getAlternatives(exercise) ?? [] as alt}
 								<button class="swap-alt" onpointerdown={(e) => e.stopPropagation()} onclick={() => handleSwapSelect(exercise.id, alt)} disabled={swappingId === exercise.id}>
 									<span class="swap-alt-name">{alt.exercise_name}</span>
-									<span class="swap-alt-meta">{alt.equipment}</span>
+									{#if alt.equipment}<span class="swap-alt-meta">{alt.equipment}</span>{/if}
 								</button>
 							{/each}
 						{:else}
@@ -646,32 +686,41 @@
 	/* ═══ Header ═══ */
 	.header {
 		display: flex;
-		align-items: center;
-		gap: var(--space-3);
+		flex-direction: column;
+		gap: var(--space-2);
 	}
 
-	.back-link {
+	.header-bar {
 		display: flex;
 		align-items: center;
-		gap: var(--space-1);
-		color: var(--color-text-secondary);
-		text-decoration: none;
-		font-size: var(--text-sm);
-		font-weight: var(--weight-medium);
-		padding: var(--space-2);
-		margin: calc(-1 * var(--space-2));
-		border-radius: var(--radius-sm);
-		transition: color var(--duration-fast);
-		flex-shrink: 0;
+		justify-content: space-between;
 	}
 
-	.back-link:hover {
+	.back-btn {
+		width: 40px;
+		height: 40px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--color-text-secondary);
+		text-decoration: none;
+		border-radius: var(--radius);
+		transition: color var(--duration-fast);
+		flex-shrink: 0;
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	.back-btn:hover {
 		color: var(--color-text);
 	}
 
-	.header-center {
-		flex: 1;
-		min-width: 0;
+	.header-slot {
+		width: 40px;
+		height: 40px;
+		flex-shrink: 0;
+	}
+
+	.header-context {
 		text-align: center;
 	}
 
@@ -687,14 +736,6 @@
 		font-size: var(--text-sm);
 		color: var(--color-text-secondary);
 		text-transform: capitalize;
-	}
-
-	.header-week {
-		font-family: var(--font-mono);
-		font-size: var(--text-xs);
-		color: var(--color-text-tertiary);
-		font-weight: var(--weight-bold);
-		flex-shrink: 0;
 	}
 
 	/* ═══ Rest State ═══ */

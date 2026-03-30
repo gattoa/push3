@@ -23,6 +23,7 @@
 - `@sveltejs/kit` — framework
 - `@sveltejs/adapter-vercel` — Vercel deployment adapter
 - `@sveltejs/vite-plugin-svelte` — build tooling
+- `lucide-svelte` — icon library (Dumbbell, Trophy, TrendingUp, ChevronRight, ClipboardCheck, Eye, X, Menu, etc.)
 - `vite` — bundler
 
 ## Distribution: PWA
