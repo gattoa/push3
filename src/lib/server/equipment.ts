@@ -1,19 +1,10 @@
 /**
- * Shared equipment constants used by onboarding and check-in.
- * Maps user-facing equipment names to ExerciseDB categories.
+ * Server-side equipment mapping utilities.
+ * User-facing constants are in $lib/equipment-options.ts (shared with client).
  */
 
-/** Equipment options shown in the UI (user-facing names) */
-export const EQUIPMENT_OPTIONS = [
-	// Free weights
-	'barbell', 'dumbbell', 'ez barbell', 'kettlebell',
-	// Stations
-	'cable', 'machine', 'smith machine',
-	// Furniture
-	'bench', 'squat rack', 'pull-up bar',
-	// Minimal
-	'resistance band'
-] as const;
+import { EQUIPMENT_OPTIONS, EQUIPMENT_GROUPS } from '$lib/equipment-options';
+export { EQUIPMENT_OPTIONS, EQUIPMENT_GROUPS };
 
 /**
  * Station/furniture items are not ExerciseDB equipment types.

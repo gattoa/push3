@@ -120,7 +120,7 @@
 			errorMessage = '';
 			return async ({ result, update }) => {
 				if (result.type === 'failure') {
-					errorMessage = result.data?.message || 'Something went wrong. Please try again.';
+					errorMessage = (result.data as Record<string, string>)?.message || 'Something went wrong. Please try again.';
 					submitting = false;
 				} else {
 					await update();
