@@ -1,7 +1,7 @@
 <script lang="ts">
 	import {
 		Check, X, Trophy, ArrowLeft,
-		ChevronDown, TrendingUp, Flame, Dumbbell, ArrowLeftRight
+		ChevronDown, ChevronUp, TrendingUp, Flame, Dumbbell, ArrowLeftRight, ArrowUpDown
 	} from 'lucide-svelte';
 	import type { FullPlanDay, FullPlanExercise, FullPlanSet, ExerciseAlternative } from '$lib/types/database';
 	import { isPR as isPRUtil } from '$lib/utils/pr';
@@ -19,6 +19,41 @@
 	const exerciseHistory = $derived(data.exerciseHistory as Record<string, { lastWeight: number; lastReps: number; bestE1RM: number }>);
 
 	const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+	// ── Edit Mode (exercise reorder) ──────────────────────────
+	let editMode = $state(false);
+
+	async function moveExercise(exerciseIndex: number, direction: 'up' | 'down') {
+		const sorted = [...day.exercises].sort((a, b) => a.order_index - b.order_index);
+		const targetIndex = direction === 'up' ? exerciseIndex - 1 : exerciseIndex + 1;
+		if (targetIndex < 0 || targetIndex >= sorted.length) return;
+
+		// Swap order_index values
+		const tempOrder = sorted[exerciseIndex].order_index;
+		sorted[exerciseIndex].order_index = sorted[targetIndex].order_index;
+		sorted[targetIndex].order_index = tempOrder;
+
+		// Optimistic UI update
+		day = { ...day, exercises: [...sorted] };
+
+		// API call
+		const res = await fetch('/api/reorder-exercises', {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				day_id: day.id,
+				exercise_order: sorted.map((e) => ({ id: e.id, order_index: e.order_index }))
+			})
+		});
+
+		if (!res.ok) {
+			// Revert
+			sorted[targetIndex].order_index = sorted[exerciseIndex].order_index;
+			sorted[exerciseIndex].order_index = tempOrder;
+			day = { ...day, exercises: [...sorted] };
+			addToast('Failed to reorder', 'error');
+		}
+	}
 
 	// Skip pushUp animation on client-side navigation (only play on fresh/SSR load)
 	let isClientNav = $state(false);
@@ -356,11 +391,34 @@
 	<!-- ═══ Header ═══ -->
 	<header class="header" class:push-up={!isClientNav} style="--d:0">
 		<div class="header-bar">
-			<a href="/plan" class="back-btn" title="Back to week">
-				<ArrowLeft size={18} strokeWidth={2} />
-			</a>
-			<SegmentedControl active="week" />
-			<div class="header-slot"></div>
+			{#if editMode}
+				<div class="header-slot"></div>
+			{:else}
+				<a href="/plan" class="back-btn" title="Back to week">
+					<ArrowLeft size={18} strokeWidth={2} />
+				</a>
+			{/if}
+			{#if editMode}
+				<span class="edit-mode-title">Reorder Exercises</span>
+			{:else}
+				<SegmentedControl active="week" />
+			{/if}
+			{#if day.exercises.length > 1}
+				<button
+					class="reorder-btn"
+					class:active={editMode}
+					onclick={() => editMode = !editMode}
+					title={editMode ? 'Done reordering' : 'Reorder exercises'}
+				>
+					{#if editMode}
+						Done
+					{:else}
+						<ArrowUpDown size={16} strokeWidth={2} />
+					{/if}
+				</button>
+			{:else}
+				<div class="header-slot"></div>
+			{/if}
 		</div>
 		<div class="header-context">
 			<h1 class="header-day">{DAY_NAMES[day.day_index]}</h1>
@@ -402,6 +460,33 @@
 				{@const hasPR = exercise.sets.some((s) => isPR(exercise.exercise_id, s.id))}
 				{@const hist = exerciseHistory[exercise.exercise_id]}
 
+				{#if editMode}
+					<!-- ═══ EDIT MODE: Reorder Controls ═══ -->
+					<div class="reorder-row push-up" style="--d:{i + 2}">
+						<div class="reorder-controls">
+							<button
+								class="move-btn"
+								disabled={i === 0}
+								onclick={() => moveExercise(i, 'up')}
+								title="Move up"
+							>
+								<ChevronUp size={18} strokeWidth={2.5} />
+							</button>
+							<button
+								class="move-btn"
+								disabled={i === day.exercises.length - 1}
+								onclick={() => moveExercise(i, 'down')}
+								title="Move down"
+							>
+								<ChevronDown size={18} strokeWidth={2.5} />
+							</button>
+						</div>
+						<div class="reorder-card">
+							<span class="reorder-num">{i + 1}</span>
+							<span class="reorder-name">{exercise.exercise_name}</span>
+						</div>
+					</div>
+				{:else}
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<div
 					class="flip-container push-up"
@@ -597,6 +682,7 @@
 						{/if}
 					</div>
 				</div>
+			{/if}
 			{/each}
 		</div>
 
@@ -1456,5 +1542,115 @@
 	.btn-secondary:hover {
 		border-color: var(--color-border-strong);
 		color: var(--color-text);
+	}
+
+	/* ── Edit Mode / Reorder ── */
+	.edit-mode-title {
+		font-family: var(--font-display);
+		font-size: var(--text-sm);
+		font-weight: var(--weight-semibold);
+		color: var(--color-text);
+	}
+
+	.reorder-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		min-width: 40px;
+		height: 40px;
+		padding: 0 var(--space-3);
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius);
+		color: var(--color-text-secondary);
+		font-family: var(--font-display);
+		font-size: var(--text-xs);
+		font-weight: var(--weight-semibold);
+		cursor: pointer;
+		transition: all var(--duration-normal) var(--ease-out);
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	.reorder-btn:hover {
+		border-color: var(--color-border-strong);
+		color: var(--color-text);
+	}
+
+	.reorder-btn.active {
+		background: var(--color-activity-muted);
+		border-color: var(--color-activity);
+		color: var(--color-activity);
+	}
+
+	.reorder-row {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+	}
+
+	.reorder-controls {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-1);
+		flex-shrink: 0;
+	}
+
+	.move-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 36px;
+		height: 36px;
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		color: var(--color-text-secondary);
+		cursor: pointer;
+		transition: all var(--duration-fast) var(--ease-out);
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	.move-btn:hover:not(:disabled) {
+		background: var(--color-surface-hover);
+		border-color: var(--color-border-strong);
+		color: var(--color-text);
+	}
+
+	.move-btn:active:not(:disabled) {
+		background: var(--color-surface-active);
+	}
+
+	.move-btn:disabled {
+		opacity: 0.3;
+		cursor: default;
+	}
+
+	.reorder-card {
+		flex: 1;
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+		padding: var(--space-3) var(--space-4);
+		background: var(--color-surface);
+		border: 1.5px solid var(--color-border);
+		border-left: 3px solid var(--color-activity);
+		border-radius: var(--radius);
+	}
+
+	.reorder-num {
+		font-family: var(--font-mono);
+		font-size: var(--text-xs);
+		font-weight: var(--weight-bold);
+		color: var(--color-text-tertiary);
+		min-width: 1.25rem;
+		text-align: center;
+	}
+
+	.reorder-name {
+		font-family: var(--font-body);
+		font-size: var(--text-sm);
+		font-weight: var(--weight-medium);
+		color: var(--color-text);
+		text-transform: capitalize;
 	}
 </style>

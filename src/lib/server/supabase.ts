@@ -69,16 +69,23 @@ export async function updateUserSettings(
 export async function getFullPlan(
 	supabase: SupabaseClient,
 	userId: string,
-	weekNumber?: number
+	options?: { weekNumber?: number; weekStartDate?: string; latest?: boolean }
 ): Promise<FullPlan | null> {
+	// If "latest" is requested, pass week_number -1 as a signal to the RPC
+	const weekNumber = options?.latest ? -1 : (options?.weekNumber ?? null);
+
 	const { data, error } = await supabase.rpc('get_full_plan', {
 		p_user_id: userId,
-		p_week_number: weekNumber ?? null
+		p_week_number: weekNumber,
+		p_week_start_date: options?.weekStartDate ?? null
 	});
 
 	if (error) {
-		console.error('Failed to fetch full plan:', error.message);
+		console.error('[getFullPlan] RPC error:', error.message, '| options:', JSON.stringify(options));
 		return null;
+	}
+	if (!data) {
+		console.warn('[getFullPlan] RPC returned null | options:', JSON.stringify(options));
 	}
 	return data;
 }

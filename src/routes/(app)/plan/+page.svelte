@@ -1,16 +1,18 @@
 <script lang="ts">
 	import type { FullPlan, FullPlanDay } from '$lib/types/database';
 	import SegmentedControl from '$lib/components/SegmentedControl.svelte';
+	import { ClipboardCheck, Play } from 'lucide-svelte';
 	import { page } from '$app/state';
 
 	let { data } = $props();
-	const plan = $derived(data.fullPlan as FullPlan);
+	const plan = $derived(data.fullPlan as FullPlan | null);
 	const todayIndex = $derived(data.todayIndex as number);
+	const hasPreviousPlan = $derived(data.hasPreviousPlan as boolean);
 
 	const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 	let sortedDays = $derived(
-		[...plan.days].sort((a, b) => a.day_index - b.day_index)
+		plan ? [...plan.days].sort((a, b) => a.day_index - b.day_index) : []
 	);
 
 	function getDayProgress(day: FullPlanDay): { done: number; total: number } {
@@ -72,56 +74,86 @@
 		<h1 class="header-title">This Week</h1>
 	</header>
 
-	<div class="day-list">
-		{#each sortedDays as day}
-			{@const progress = getDayProgress(day)}
-			{@const isToday = day.day_index === todayIndex}
-			{@const isRest = day.exercises.length === 0}
-			{@const isComplete = progress.total > 0 && progress.done === progress.total}
-			<a
-				href="/workout/{day.day_index}"
-				class="day-card"
-				class:today={isToday}
-				class:rest={isRest}
-				class:complete={isComplete}
-			>
-				<div class="day-card-top">
-					<span class="day-name">{DAY_NAMES[day.day_index]}</span>
-					{#if isToday}
-						<span class="today-badge">Today</span>
-					{/if}
-				</div>
-
-				{#if isRest}
-					<span class="rest-label">Rest Day</span>
-				{:else}
-					<span class="split-label">{day.split_label}</span>
-					<div class="day-card-stats">
-						<span>{day.exercises.length} exercises</span>
-						<span class="dot-sep">&middot;</span>
-						<span>{progress.total} sets</span>
+	{#if plan}
+		<div class="day-list">
+			{#each sortedDays as day}
+				{@const progress = getDayProgress(day)}
+				{@const isToday = day.day_index === todayIndex}
+				{@const isRest = day.exercises.length === 0}
+				{@const isComplete = progress.total > 0 && progress.done === progress.total}
+				<a
+					href="/workout/{day.day_index}"
+					class="day-card"
+					class:today={isToday}
+					class:rest={isRest}
+					class:complete={isComplete}
+				>
+					<div class="day-card-top">
+						<span class="day-name">{DAY_NAMES[day.day_index]}</span>
+						{#if isToday}
+							<span class="today-badge">Today</span>
+						{/if}
 					</div>
-					{#if progress.total > 0}
-						<div class="mini-progress">
-							<div class="mini-progress-bar">
-								<div
-									class="mini-progress-fill"
-									style="width: {(progress.done / progress.total) * 100}%"
-								></div>
-							</div>
-							<span class="mini-progress-text">
-								{#if isComplete}
-									&#10003;
-								{:else}
-									{progress.done}/{progress.total}
-								{/if}
-							</span>
+
+					{#if isRest}
+						<span class="rest-label">Rest Day</span>
+					{:else}
+						<span class="split-label">{day.split_label}</span>
+						<div class="day-card-stats">
+							<span>{day.exercises.length} exercises</span>
+							<span class="dot-sep">&middot;</span>
+							<span>{progress.total} sets</span>
 						</div>
+						{#if progress.total > 0}
+							<div class="mini-progress">
+								<div class="mini-progress-bar">
+									<div
+										class="mini-progress-fill"
+										style="width: {(progress.done / progress.total) * 100}%"
+									></div>
+								</div>
+								<span class="mini-progress-text">
+									{#if isComplete}
+										&#10003;
+									{:else}
+										{progress.done}/{progress.total}
+									{/if}
+								</span>
+							</div>
+						{/if}
 					{/if}
+				</a>
+			{/each}
+		</div>
+	{:else}
+		<div class="empty-state">
+			<div class="empty-icon">
+				{#if hasPreviousPlan}
+					<ClipboardCheck size={32} />
+				{:else}
+					<Play size={32} />
+				{/if}
+			</div>
+			<h2 class="empty-title">No plan for this week</h2>
+			<p class="empty-desc">
+				{#if hasPreviousPlan}
+					Check in on last week to generate your next plan.
+				{:else}
+					Generate your first training plan to get started.
+				{/if}
+			</p>
+			<a
+				href={hasPreviousPlan ? '/check-in' : '/plan/generate'}
+				class="empty-cta"
+			>
+				{#if hasPreviousPlan}
+					Check In
+				{:else}
+					Generate Plan
 				{/if}
 			</a>
-		{/each}
-	</div>
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -361,5 +393,62 @@
 
 	.day-card.complete .mini-progress-text {
 		color: var(--color-accent);
+	}
+
+	/* Empty state */
+	.empty-state {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		text-align: center;
+		padding: var(--space-16) var(--space-4);
+		gap: var(--space-3);
+	}
+
+	.empty-icon {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 64px;
+		height: 64px;
+		border-radius: var(--radius-full);
+		background: var(--color-activity-muted);
+		color: var(--color-activity);
+		margin-bottom: var(--space-2);
+	}
+
+	.empty-title {
+		font-family: var(--font-display);
+		font-size: var(--text-lg);
+		font-weight: var(--weight-bold);
+		color: var(--color-text);
+	}
+
+	.empty-desc {
+		font-size: var(--text-sm);
+		color: var(--color-text-secondary);
+		max-width: 260px;
+		line-height: var(--leading-normal);
+	}
+
+	.empty-cta {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding: var(--space-3) var(--space-6);
+		background: var(--color-activity);
+		color: var(--color-text-inverse);
+		font-family: var(--font-display);
+		font-size: var(--text-sm);
+		font-weight: var(--weight-semibold);
+		border-radius: var(--radius);
+		text-decoration: none;
+		margin-top: var(--space-2);
+		transition: opacity var(--duration-normal) var(--ease-out);
+	}
+
+	.empty-cta:hover {
+		opacity: 0.9;
 	}
 </style>

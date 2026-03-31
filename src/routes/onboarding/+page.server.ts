@@ -50,7 +50,7 @@ export const actions: Actions = {
 		if (!dbEquipment.includes('body weight')) {
 			dbEquipment.push('body weight');
 		}
-		const training_days_per_week = parseInt(formData.get('training_days_per_week') as string, 10);
+		const training_days = (formData.getAll('training_days') as string[]).map(Number).filter((n) => !isNaN(n) && n >= 0 && n <= 6);
 		const session_duration_minutes = parseInt(formData.get('session_duration_minutes') as string, 10);
 		const injuries = (formData.get('injuries') as string)
 			?.split(',')
@@ -59,7 +59,7 @@ export const actions: Actions = {
 		const unit_pref = (formData.get('unit_pref') as 'lb' | 'kg') || 'lb';
 
 		// Validate required fields (check original equipment selection, not mapped)
-		if (!date_of_birth || !gender || !goals || !experience_level || equipment.length === 0 || !training_days_per_week || !session_duration_minutes) {
+		if (!date_of_birth || !gender || !goals || !experience_level || equipment.length === 0 || training_days.length < 2 || !session_duration_minutes) {
 			return fail(400, { message: 'Please complete all required fields.' });
 		}
 
@@ -75,7 +75,7 @@ export const actions: Actions = {
 			experience_level,
 			equipment: dbEquipment,
 			injuries,
-			training_days_per_week,
+			training_days,
 			session_duration_minutes,
 			unit_pref
 		};

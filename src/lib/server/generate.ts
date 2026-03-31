@@ -62,7 +62,7 @@ const PLAN_TOOL: Anthropic.Tool = {
 		properties: {
 			days: {
 				type: 'array',
-				description: 'Array of training days (length must match training_days_per_week + rest days to fill 7 days)',
+				description: 'Array of 7 days (training days on athlete-specified indices, rest days on all others)',
 				items: {
 					type: 'object',
 					properties: {
@@ -133,7 +133,7 @@ function buildSystemPrompt(): string {
 
 ## Rules
 1. Generate exactly 7 days (day_index 0-6, Monday-Sunday). Non-training days should have split_label "Rest" and empty exercises array.
-2. The number of training days must match the athlete's training_days_per_week preference.
+2. Assign workouts to the athlete's specified training day indices. All other days are Rest. If the plan is generated mid-week, do not schedule training on days that have already passed. Distribute the athlete's training volume across the remaining available days. Always generate a plan regardless of how many days remain — even a single training day has value.
 3. Only use exercises from the provided exercise catalog. Every exercise_id must exist in the catalog.
 4. For Week 1 (cold start) or any exercise without an established performance baseline: set target_weight to null. The athlete will log their working weight to establish a baseline.
 5. For Week 2+ with baselines: prescribe target_weight based on historical performance.
@@ -210,6 +210,12 @@ function buildUserMessage(
 
 	const age = user_settings.date_of_birth ? calculateAge(user_settings.date_of_birth) : null;
 
+	// Mid-week awareness: tell the trainer what day it is
+	const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+	const jsDay = new Date().getDay();
+	const todayIndex = jsDay === 0 ? 6 : jsDay - 1; // Convert to 0=Mon scheme
+	const daysRemaining = 7 - todayIndex;
+
 	let msg = `## Athlete Profile
 - Date of birth: ${user_settings.date_of_birth ?? 'Not provided'}
 - Gender: ${user_settings.gender ?? 'Not provided'}
@@ -217,10 +223,12 @@ function buildUserMessage(
 - Goal: ${user_settings.goals}
 - Experience: ${user_settings.experience_level}
 - Equipment: ${user_settings.equipment.join(', ')}
-- Training days/week: ${user_settings.training_days_per_week}
+- Training days: ${user_settings.training_days.map((d: number) => DAY_NAMES[d]).join(', ')} (day indices: ${user_settings.training_days.join(', ')})
 - Session duration: ${user_settings.session_duration_minutes} minutes
 - Unit preference: ${user_settings.unit_pref}
 - Injuries: ${user_settings.injuries.length > 0 ? user_settings.injuries.join(', ') : 'None'}
+- Today: ${DAY_NAMES[todayIndex]} (day_index ${todayIndex})
+- Days remaining this week: ${daysRemaining}
 
 ## Week Number: ${next_week_number}
 ${next_week_number === 1 ? '**This is Week 1 (cold start). Set ALL target_weight values to null.**' : ''}
@@ -317,17 +325,17 @@ export async function generatePlan(
 		return { error: 'Failed to load generation context.' };
 	}
 
-	// 2. Check for existing active plan for this week
+	// 2. Check for existing plan for this calendar week
 	const { data: existingPlan } = await supabase
 		.from('weekly_plans')
 		.select('id')
 		.eq('user_id', userId)
-		.eq('week_number', context.next_week_number)
+		.eq('week_start_date', context.next_week_start_date)
 		.in('status', ['generating', 'active'])
 		.maybeSingle();
 
 	if (existingPlan) {
-		return { error: `A plan already exists for week ${context.next_week_number}.` };
+		return { error: `A plan already exists for the week of ${context.next_week_start_date}.` };
 	}
 
 	// 3. Build exercise catalog filtered by athlete's equipment + injuries
@@ -400,6 +408,7 @@ export async function generatePlan(
 		{
 			user_id: userId,
 			week_number: context.next_week_number,
+			week_start_date: context.next_week_start_date,
 			status: 'generating'
 		},
 		generatedPlan.days.map((day) => ({

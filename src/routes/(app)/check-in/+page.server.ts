@@ -7,9 +7,11 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
 	const { user } = await safeGetSession();
 	if (!user) redirect(303, '/');
 
-	const fullPlan = await getFullPlan(supabase, user.id);
+	// Check-in reflects on the most recent plan (not necessarily this week)
+	const fullPlan = await getFullPlan(supabase, user.id, { latest: true });
 	if (!fullPlan || !fullPlan.plan) {
-		redirect(303, '/plan/generate');
+		console.warn('[check-in] No plan found for user:', user.id, '— redirecting to /plan');
+		redirect(303, '/plan');
 	}
 
 	const settings = await getUserSettings(supabase, user.id);
