@@ -11,12 +11,20 @@ export const GET: RequestHandler = async ({ locals: { safeGetSession, supabase }
 	const { user } = await safeGetSession();
 	if (!user) return json({ error: 'Not authenticated' }, { status: 401 });
 
+	// Check for active/generating plan for the current calendar week
+	const now = new Date();
+	const jsDay = now.getDay();
+	const mondayOffset = jsDay === 0 ? -6 : 1 - jsDay;
+	const monday = new Date(now);
+	monday.setDate(now.getDate() + mondayOffset);
+	const currentMonday = monday.toISOString().split('T')[0];
+
 	const { data: plan } = await supabase
 		.from('weekly_plans')
-		.select('id, week_number, status')
+		.select('id, week_number, status, week_start_date')
 		.eq('user_id', user.id)
+		.eq('week_start_date', currentMonday)
 		.in('status', ['active', 'generating'])
-		.order('week_number', { ascending: false })
 		.limit(1)
 		.maybeSingle();
 

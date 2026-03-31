@@ -12,7 +12,7 @@
 	let experienceLevel = $state('');
 	let goals = $state('');
 	let equipment = $state<string[]>([]);
-	let trainingDays = $state(4);
+	let trainingDays = $state<number[]>([]);
 	let sessionDuration = $state(60);
 	let hasInjuries = $state<boolean | null>(null);
 	let injuries = $state('');
@@ -61,11 +61,21 @@
 
 	const durationOptions = [30, 45, 60, 75, 90];
 
+	const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
 	function toggleEquipment(item: string) {
 		if (equipment.includes(item)) {
 			equipment = equipment.filter((e) => e !== item);
 		} else {
 			equipment = [...equipment, item];
+		}
+	}
+
+	function toggleTrainingDay(dayIndex: number) {
+		if (trainingDays.includes(dayIndex)) {
+			trainingDays = trainingDays.filter((d) => d !== dayIndex);
+		} else if (trainingDays.length < 6) {
+			trainingDays = [...trainingDays, dayIndex].sort((a, b) => a - b);
 		}
 	}
 
@@ -82,7 +92,7 @@
 		step === 2 ? experienceLevel !== '' :
 		step === 3 ? goals !== '' :
 		step === 4 ? equipment.length > 0 :
-		step === 5 ? true :
+		step === 5 ? trainingDays.length >= 2 :
 		step === 6 ? hasInjuries !== null :
 		true
 	);
@@ -110,7 +120,7 @@
 			errorMessage = '';
 			return async ({ result, update }) => {
 				if (result.type === 'failure') {
-					errorMessage = result.data?.message || 'Something went wrong. Please try again.';
+					errorMessage = (result.data as Record<string, string>)?.message || 'Something went wrong. Please try again.';
 					submitting = false;
 				} else {
 					await update();
@@ -127,7 +137,9 @@
 		{#each equipment as eq}
 			<input type="hidden" name="equipment" value={eq} />
 		{/each}
-		<input type="hidden" name="training_days_per_week" value={trainingDays} />
+		{#each trainingDays as d}
+			<input type="hidden" name="training_days" value={d} />
+		{/each}
 		<input type="hidden" name="session_duration_minutes" value={sessionDuration} />
 		<input type="hidden" name="injuries" value={hasInjuries ? injuries : ''} />
 		<input type="hidden" name="unit_pref" value="lb" />
@@ -258,22 +270,31 @@
 			<!-- Step 5: Training Schedule -->
 			{#if step === 5}
 				<h2>Training schedule</h2>
-				<p class="step-desc">How many days per week and how long per session?</p>
+				<p class="step-desc">Tap the days you train.</p>
 
 				<div class="schedule-group">
-					<span class="field-label" id="days-label">Days per week</span>
-					<div class="chip-grid compact" role="group" aria-labelledby="days-label">
-						{#each [2, 3, 4, 5, 6] as d}
+					<span class="field-label" id="days-label">Training days</span>
+					<div class="day-picker" role="group" aria-labelledby="days-label">
+						{#each DAY_NAMES as name, i}
 							<button
 								type="button"
-								class="chip"
-								class:selected={trainingDays === d}
-								onclick={() => trainingDays = d}
+								class="day-chip"
+								class:selected={trainingDays.includes(i)}
+								onclick={() => toggleTrainingDay(i)}
 							>
-								{d}
+								{name}
 							</button>
 						{/each}
 					</div>
+					<span class="day-count">
+						{#if trainingDays.length === 0}
+							Select at least 2 days
+						{:else if trainingDays.length === 1}
+							Select 1 more day
+						{:else}
+							{trainingDays.length} days selected
+						{/if}
+					</span>
 				</div>
 
 				<div class="schedule-group">
@@ -545,6 +566,45 @@
 
 	.schedule-group {
 		margin-bottom: 1.5rem;
+	}
+
+	.day-picker {
+		display: flex;
+		gap: 0.375rem;
+	}
+
+	.day-chip {
+		flex: 1;
+		padding: 0.625rem 0;
+		background: var(--color-surface);
+		border: 1.5px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		color: var(--color-text-secondary);
+		font-family: var(--font-body);
+		font-size: var(--text-xs);
+		font-weight: var(--weight-medium);
+		cursor: pointer;
+		transition: all var(--duration-normal) var(--ease-out);
+		text-align: center;
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	.day-chip:hover {
+		border-color: var(--color-border-strong);
+	}
+
+	.day-chip.selected {
+		background: var(--color-activity-muted);
+		border-color: var(--color-activity);
+		color: var(--color-activity);
+		font-weight: var(--weight-semibold);
+	}
+
+	.day-count {
+		display: block;
+		margin-top: 0.5rem;
+		font-size: var(--text-xs);
+		color: var(--color-text-tertiary);
 	}
 
 	.field-label {

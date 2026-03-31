@@ -2,6 +2,16 @@ import { redirect, error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { getFullPlan, getExerciseHistory } from '$lib/server/supabase';
 
+/** Compute Monday of the current calendar week (ISO: Monday = start of week) */
+function getCurrentMonday(): string {
+	const now = new Date();
+	const jsDay = now.getDay(); // 0=Sun
+	const mondayOffset = jsDay === 0 ? -6 : 1 - jsDay;
+	const monday = new Date(now);
+	monday.setDate(now.getDate() + mondayOffset);
+	return monday.toISOString().split('T')[0];
+}
+
 export const load: PageServerLoad = async ({ params, locals: { safeGetSession, supabase } }) => {
 	const { user } = await safeGetSession();
 	if (!user) redirect(303, '/');
@@ -11,9 +21,12 @@ export const load: PageServerLoad = async ({ params, locals: { safeGetSession, s
 		error(400, 'Invalid day index. Must be 0-6.');
 	}
 
-	const fullPlan = await getFullPlan(supabase, user.id);
+	const currentMonday = getCurrentMonday();
+	const fullPlan = await getFullPlan(supabase, user.id, { weekStartDate: currentMonday });
+
 	if (!fullPlan || !fullPlan.plan) {
-		redirect(303, '/plan/generate');
+		// No plan for this week — send to plan page (shows empty state)
+		redirect(303, '/plan');
 	}
 
 	const day = fullPlan.days.find((d) => d.day_index === dayIndex);

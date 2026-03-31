@@ -16,7 +16,7 @@ export interface UserSettings {
 	experience_level: string;
 	equipment: string[];
 	injuries: string[];
-	training_days_per_week: number;
+	training_days: number[];
 	session_duration_minutes: number;
 	unit_pref: 'lb' | 'kg';
 	created_at: string;
@@ -27,6 +27,7 @@ export interface WeeklyPlan {
 	id: string;
 	user_id: string;
 	week_number: number;
+	week_start_date: string;
 	status: 'generating' | 'active' | 'completed';
 	created_at: string;
 }
@@ -83,6 +84,7 @@ export interface CheckIn {
 	user_id: string;
 	week_number: number;
 	body_weight: number | null;
+	energy_level: 'fully_recovered' | 'mostly_recovered' | 'still_fatigued' | 'beat_up' | null;
 	injury_changes: string | null;
 	equipment_changes: string | null;
 	notes: string | null;
@@ -101,7 +103,7 @@ export interface UserSettingsInsert {
 	experience_level?: string;
 	equipment?: string[];
 	injuries?: string[];
-	training_days_per_week?: number;
+	training_days?: number[];
 	session_duration_minutes?: number;
 	unit_pref?: 'lb' | 'kg';
 }
@@ -113,7 +115,7 @@ export interface UserSettingsUpdate {
 	experience_level?: string;
 	equipment?: string[];
 	injuries?: string[];
-	training_days_per_week?: number;
+	training_days?: number[];
 	session_duration_minutes?: number;
 	unit_pref?: 'lb' | 'kg';
 	updated_at?: string;
@@ -122,6 +124,7 @@ export interface UserSettingsUpdate {
 export interface WeeklyPlanInsert {
 	user_id: string;
 	week_number: number;
+	week_start_date: string;
 	status?: 'generating' | 'active' | 'completed';
 }
 
@@ -167,6 +170,7 @@ export interface CheckInInsert {
 	user_id: string;
 	week_number: number;
 	body_weight?: number | null;
+	energy_level?: 'fully_recovered' | 'mostly_recovered' | 'still_fatigued' | 'beat_up' | null;
 	injury_changes?: string | null;
 	equipment_changes?: string | null;
 	notes?: string | null;
@@ -211,6 +215,7 @@ export interface FullPlanSet {
 /** Shape returned by get_generation_context RPC */
 export interface GenerationContext {
 	next_week_number: number;
+	next_week_start_date: string;
 	user_settings: UserSettings;
 	check_in_history: CheckIn[];
 	previous_plans: {
