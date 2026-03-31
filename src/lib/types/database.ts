@@ -84,6 +84,7 @@ export interface CheckIn {
 	user_id: string;
 	week_number: number;
 	body_weight: number | null;
+	energy_level: 'fully_recovered' | 'mostly_recovered' | 'still_fatigued' | 'beat_up' | null;
 	injury_changes: string | null;
 	equipment_changes: string | null;
 	notes: string | null;
@@ -169,6 +170,7 @@ export interface CheckInInsert {
 	user_id: string;
 	week_number: number;
 	body_weight?: number | null;
+	energy_level?: 'fully_recovered' | 'mostly_recovered' | 'still_fatigued' | 'beat_up' | null;
 	injury_changes?: string | null;
 	equipment_changes?: string | null;
 	notes?: string | null;

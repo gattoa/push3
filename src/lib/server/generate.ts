@@ -12,6 +12,7 @@ import type { Exercise } from '$lib/types/exercise';
 import { getGenerationContext, savePlan } from '$lib/server/supabase';
 import { getExercisesByEquipment } from '$lib/server/exercisedb';
 import { filterByInjuries } from '$lib/server/injuries';
+import { mapEquipmentToDb } from '$lib/server/equipment';
 
 // ============================================================================
 // Types for Claude's structured output
@@ -159,6 +160,11 @@ function buildSystemPrompt(): string {
     - Athletes under 18: prioritize bodyweight and machine exercises, limit heavy compound barbell lifts (no 1-3RM), focus on movement quality and moderate rep ranges (8-15).
     - Use gender to inform volume distribution where applicable (e.g., upper/lower volume split), but do not make assumptions about strength levels — rely on logged performance data.
     - If age or gender is not provided, program as a general adult.
+16. Factor in the athlete's self-reported recovery level from their latest check-in:
+    - "fully_recovered" or "mostly_recovered": normal programming.
+    - "still_fatigued": reduce volume ~20% and intensity for the upcoming week.
+    - "beat_up": prescribe a deload week (40-60% volume reduction, maintain movement patterns).
+    - If recovery has been "still_fatigued" or "beat_up" for 2+ consecutive check-ins, prioritize a full deload regardless of other signals.
 
 ## Output
 Call the generate_weekly_plan tool exactly once with the complete plan.`;
@@ -250,8 +256,22 @@ ${JSON.stringify(historical_set_logs, null, 1)}
 	}
 
 	if (check_in_history.length > 0) {
-		// Surface the most recent check-in notes prominently
+		// Surface the most recent check-in notes and recovery prominently
 		const latestCheckIn = check_in_history[check_in_history.length - 1];
+
+		if (latestCheckIn.energy_level) {
+			const RECOVERY_LABELS: Record<string, string> = {
+				fully_recovered: 'Fully Recovered',
+				mostly_recovered: 'Mostly Recovered',
+				still_fatigued: 'Still Fatigued',
+				beat_up: 'Beat Up'
+			};
+			msg += `\n## Recovery Status (from latest check-in)
+- Recovery: ${RECOVERY_LABELS[latestCheckIn.energy_level] ?? latestCheckIn.energy_level}
+Factor this into volume and intensity decisions for the upcoming week.
+`;
+		}
+
 		if (latestCheckIn.notes) {
 			msg += `\n## Athlete Notes (from latest check-in)
 "${latestCheckIn.notes}"
@@ -339,8 +359,11 @@ export async function generatePlan(
 	}
 
 	// 3. Build exercise catalog filtered by athlete's equipment + injuries
-	console.log('[generate] Equipment:', context.user_settings.equipment);
-	const rawCatalog = await buildExerciseCatalog(context.user_settings.equipment);
+	// Map user-facing equipment names to ExerciseDB categories for catalog fetching
+	const dbEquipment = mapEquipmentToDb(context.user_settings.equipment);
+	console.log('[generate] User equipment:', context.user_settings.equipment);
+	console.log('[generate] DB equipment (mapped):', dbEquipment);
+	const rawCatalog = await buildExerciseCatalog(dbEquipment);
 	console.log('[generate] Raw catalog size:', rawCatalog.length);
 
 	const { filtered: fullCatalog, excluded } = filterByInjuries(rawCatalog, context.user_settings.injuries);

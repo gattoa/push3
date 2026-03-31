@@ -2,6 +2,8 @@ import { redirect, fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { getFullPlan, getUserSettings, createCheckIn, updateUserSettings } from '$lib/server/supabase';
 import type { FullPlanDay } from '$lib/types/database';
+// Equipment is stored as user-facing names. Mapping to ExerciseDB categories
+// happens at plan generation time in generate.ts.
 
 export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase } }) => {
 	const { user } = await safeGetSession();
@@ -71,23 +73,28 @@ export const actions: Actions = {
 		const formData = await request.formData();
 		const weekNumber = parseInt(formData.get('week_number') as string, 10);
 		const bodyWeight = formData.get('body_weight') as string;
-		const injuryChanges = formData.get('injury_changes') as string;
-		const equipmentChanges = formData.get('equipment_changes') as string;
+		const energyLevel = formData.get('energy_level') as string || null;
 		const notes = formData.get('notes') as string;
 
-		// Parse injury/equipment arrays from comma-separated
-		const newInjuries = (formData.get('injuries') as string || '')
-			.split(',').map(s => s.trim()).filter(Boolean);
-		const newEquipment = (formData.get('equipment') as string || '')
-			.split(',').map(s => s.trim()).filter(Boolean);
+		// Parse structured fields
+		const trainingDays = (formData.getAll('training_days') as string[])
+			.map(Number)
+			.filter((n) => !isNaN(n) && n >= 0 && n <= 6);
+		const sessionDuration = parseInt(formData.get('session_duration_minutes') as string, 10);
+		const newInjuries = (formData.getAll('injuries') as string[]).filter(Boolean);
+		const userEquipment = (formData.getAll('equipment') as string[]).filter(Boolean);
+
+		// Validate training days
+		if (trainingDays.length < 2) {
+			return fail(400, { error: 'Select at least 2 training days.' });
+		}
 
 		// 1. Save check-in record
 		const checkInId = await createCheckIn(supabase, {
 			user_id: user.id,
 			week_number: weekNumber,
 			body_weight: bodyWeight ? parseFloat(bodyWeight) : null,
-			injury_changes: injuryChanges || null,
-			equipment_changes: equipmentChanges || null,
+			energy_level: energyLevel as 'fully_recovered' | 'mostly_recovered' | 'still_fatigued' | 'beat_up' | null,
 			notes: notes || null
 		});
 
@@ -95,10 +102,12 @@ export const actions: Actions = {
 			return fail(500, { error: 'Failed to save check-in.' });
 		}
 
-		// 2. Update user_settings with current injuries and equipment
+		// 2. Update user_settings with all editable fields
 		const settingsResult = await updateUserSettings(supabase, user.id, {
 			injuries: newInjuries,
-			equipment: newEquipment
+			equipment: userEquipment,
+			training_days: trainingDays,
+			session_duration_minutes: sessionDuration
 		});
 
 		if (!settingsResult) {
