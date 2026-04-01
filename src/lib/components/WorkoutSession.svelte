@@ -40,34 +40,20 @@
 		if (navigator.vibrate) navigator.vibrate(10);
 	}
 
-	/** Drag handle: mouse = immediate, touch = long-press on whole card */
-	function handleHandlePointerDown(e: PointerEvent, index: number) {
-		if (!enableReorder) return;
-		e.preventDefault();
-		e.stopPropagation();
-		if (e.pointerType === 'mouse') {
-			// Mouse: start drag immediately from the handle
-			startDrag(index, e.clientY, e.currentTarget as HTMLElement, e.pointerId);
-		} else {
-			// Touch: start drag immediately from the handle too (it's an explicit affordance)
-			startDrag(index, e.clientY, e.currentTarget as HTMLElement, e.pointerId);
-		}
-	}
-
-	/** Card body: only touch gets long-press drag (mouse clicks through to accordion) */
+	/** Card body: long-press to drag. Mouse uses shorter delay (150ms), touch 300ms. */
 	function handleDragPointerDown(e: PointerEvent, index: number) {
 		if (!enableReorder) return;
 		const tag = (e.target as HTMLElement).tagName;
 		if (tag === 'INPUT' || tag === 'BUTTON') return;
 
-		// Mouse users drag via the handle only — card click goes to accordion
-		if (e.pointerType === 'mouse') return;
-
 		const startY = e.clientY;
 		dragStartY = startY;
+		const delay = e.pointerType === 'mouse' ? 150 : 300;
+		const el = e.currentTarget as HTMLElement;
+		const pointerId = e.pointerId;
 		longPressTimer = setTimeout(() => {
-			startDrag(index, startY, e.currentTarget as HTMLElement, e.pointerId);
-		}, 300);
+			startDrag(index, startY, el, pointerId);
+		}, delay);
 	}
 
 	function handleDragPointerMove(e: PointerEvent) {
@@ -549,14 +535,7 @@
 					class:card-upcoming={exState === 'upcoming'}
 				>
 					<div class="card-header" role="button" tabindex="0" onclick={() => handleCardClick(exercise.id, isExpanded)} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCardClick(exercise.id, isExpanded); } }}>
-						{#if enableReorder}
-							<!-- svelte-ignore a11y_no_static_element_interactions -->
-							<span
-								class="drag-handle"
-								aria-label="Drag to reorder"
-								onpointerdown={(e) => handleHandlePointerDown(e, i)}
-							>⠿</span>
-						{/if}
+
 						<span class="card-num" class:card-num-done={exState === 'completed' && !hasPR} class:card-num-pr={exState === 'completed' && hasPR} class:card-num-upcoming={exState === 'upcoming'}>
 							{#if exState === 'completed'}
 								<Check size={13} strokeWidth={3} />
@@ -911,26 +890,6 @@
 
 	.card-header:hover {
 		background: var(--color-surface-hover);
-	}
-
-	/* ═══ Drag Handle ═══ */
-	.drag-handle {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 20px;
-		flex-shrink: 0;
-		font-size: var(--text-lg);
-		color: var(--color-text-tertiary);
-		cursor: grab;
-		user-select: none;
-		-webkit-user-select: none;
-		letter-spacing: 0.05em;
-		touch-action: none;
-	}
-
-	.drag-handle:active {
-		cursor: grabbing;
 	}
 
 	/* ═══ Drag State ═══ */

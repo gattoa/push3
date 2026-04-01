@@ -2,7 +2,7 @@
 	import type { FullPlan, FullPlanDay } from '$lib/types/database';
 	import SegmentedControl from '$lib/components/SegmentedControl.svelte';
 	import PlanSkeleton from '$lib/components/PlanSkeleton.svelte';
-	import { ClipboardCheck, GripVertical } from 'lucide-svelte';
+	import { ClipboardCheck } from 'lucide-svelte';
 	import { page } from '$app/state';
 	import { invalidateAll } from '$app/navigation';
 	import { onDestroy } from 'svelte';
@@ -159,28 +159,18 @@
 		if (navigator.vibrate) navigator.vibrate(10);
 	}
 
-	/** Grip handle: mouse = immediate, touch = immediate (explicit affordance) */
-	function handleDayHandlePointerDown(e: PointerEvent, dayIdx: number) {
-		e.preventDefault();
-		e.stopPropagation();
-		dragStartY = e.clientY;
-		startDayDrag(dayIdx);
-	}
-
-	/** Card body: touch = long-press drag, mouse = normal click-through to link */
+	/** Card body: long-press to drag. Mouse uses shorter delay (150ms), touch 300ms. */
 	function handleDayPointerDown(e: PointerEvent, dayIdx: number) {
 		const tag = (e.target as HTMLElement).tagName;
 		if (tag === 'INPUT' || tag === 'BUTTON') return;
 
-		// Mouse users drag via the handle — card click navigates
-		if (e.pointerType === 'mouse') return;
-
 		const startY = e.clientY;
 		dragStartY = startY;
+		const delay = e.pointerType === 'mouse' ? 150 : 300;
 
 		longPressTimer = setTimeout(() => {
 			startDayDrag(dayIdx);
-		}, 300);
+		}, delay);
 	}
 
 	function handleDayPointerMove(e: PointerEvent) {
@@ -323,14 +313,6 @@
 						onclick={(e) => { if (isDragging) e.preventDefault(); }}
 					>
 						<div class="day-card-top">
-							<!-- svelte-ignore a11y_no_static_element_interactions -->
-							<span
-								class="drag-handle-day"
-								aria-label="Drag to reorder"
-								onpointerdown={(e) => handleDayHandlePointerDown(e, i)}
-							>
-								<GripVertical size={14} strokeWidth={2} />
-							</span>
 							<span class="day-name">{DAY_NAMES[day.day_index]}</span>
 							{#if isToday}
 								<span class="today-badge">Today</span>
@@ -549,19 +531,6 @@
 	.day-card-wrap.drag-target .day-card {
 		border-color: var(--color-activity);
 		box-shadow: 0 0 0 1px var(--color-activity), var(--shadow-md);
-	}
-
-	.drag-handle-day {
-		display: flex;
-		align-items: center;
-		color: var(--color-text-tertiary);
-		flex-shrink: 0;
-		touch-action: none;
-		cursor: grab;
-	}
-
-	.drag-handle-day:active {
-		cursor: grabbing;
 	}
 
 	.day-card {
