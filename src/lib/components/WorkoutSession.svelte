@@ -30,20 +30,43 @@
 	let dragCurrentY = $state(0);
 	let dragPointerId = $state<number | null>(null);
 
+	function startDrag(index: number, y: number, el: HTMLElement | null, pointerId: number) {
+		isDragging = true;
+		draggedIndex = index;
+		dragStartY = y;
+		dragCurrentY = y;
+		dragPointerId = pointerId;
+		el?.setPointerCapture(pointerId);
+		if (navigator.vibrate) navigator.vibrate(10);
+	}
+
+	/** Drag handle: mouse = immediate, touch = long-press on whole card */
+	function handleHandlePointerDown(e: PointerEvent, index: number) {
+		if (!enableReorder) return;
+		e.preventDefault();
+		e.stopPropagation();
+		if (e.pointerType === 'mouse') {
+			// Mouse: start drag immediately from the handle
+			startDrag(index, e.clientY, e.currentTarget as HTMLElement, e.pointerId);
+		} else {
+			// Touch: start drag immediately from the handle too (it's an explicit affordance)
+			startDrag(index, e.clientY, e.currentTarget as HTMLElement, e.pointerId);
+		}
+	}
+
+	/** Card body: only touch gets long-press drag (mouse clicks through to accordion) */
 	function handleDragPointerDown(e: PointerEvent, index: number) {
 		if (!enableReorder) return;
 		const tag = (e.target as HTMLElement).tagName;
 		if (tag === 'INPUT' || tag === 'BUTTON') return;
 
+		// Mouse users drag via the handle only — card click goes to accordion
+		if (e.pointerType === 'mouse') return;
+
 		const startY = e.clientY;
+		dragStartY = startY;
 		longPressTimer = setTimeout(() => {
-			isDragging = true;
-			draggedIndex = index;
-			dragStartY = startY;
-			dragCurrentY = startY;
-			dragPointerId = e.pointerId;
-			(e.currentTarget as HTMLElement)?.setPointerCapture(e.pointerId);
-			if (navigator.vibrate) navigator.vibrate(10);
+			startDrag(index, startY, e.currentTarget as HTMLElement, e.pointerId);
 		}, 300);
 	}
 
@@ -527,7 +550,12 @@
 				>
 					<div class="card-header" role="button" tabindex="0" onclick={() => handleCardClick(exercise.id, isExpanded)} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCardClick(exercise.id, isExpanded); } }}>
 						{#if enableReorder}
-							<span class="drag-handle" aria-label="Drag to reorder">⠿</span>
+							<!-- svelte-ignore a11y_no_static_element_interactions -->
+							<span
+								class="drag-handle"
+								aria-label="Drag to reorder"
+								onpointerdown={(e) => handleHandlePointerDown(e, i)}
+							>⠿</span>
 						{/if}
 						<span class="card-num" class:card-num-done={exState === 'completed' && !hasPR} class:card-num-pr={exState === 'completed' && hasPR} class:card-num-upcoming={exState === 'upcoming'}>
 							{#if exState === 'completed'}

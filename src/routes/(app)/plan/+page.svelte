@@ -153,18 +153,33 @@
 	let dragStartY = $state(0);
 	let swapping = $state(false);
 
+	function startDayDrag(dayIdx: number) {
+		isDragging = true;
+		draggedDayIndex = dayIdx;
+		if (navigator.vibrate) navigator.vibrate(10);
+	}
+
+	/** Grip handle: mouse = immediate, touch = immediate (explicit affordance) */
+	function handleDayHandlePointerDown(e: PointerEvent, dayIdx: number) {
+		e.preventDefault();
+		e.stopPropagation();
+		dragStartY = e.clientY;
+		startDayDrag(dayIdx);
+	}
+
+	/** Card body: touch = long-press drag, mouse = normal click-through to link */
 	function handleDayPointerDown(e: PointerEvent, dayIdx: number) {
 		const tag = (e.target as HTMLElement).tagName;
 		if (tag === 'INPUT' || tag === 'BUTTON') return;
+
+		// Mouse users drag via the handle — card click navigates
+		if (e.pointerType === 'mouse') return;
 
 		const startY = e.clientY;
 		dragStartY = startY;
 
 		longPressTimer = setTimeout(() => {
-			e.preventDefault();
-			isDragging = true;
-			draggedDayIndex = dayIdx;
-			if (navigator.vibrate) navigator.vibrate(10);
+			startDayDrag(dayIdx);
 		}, 300);
 	}
 
@@ -308,7 +323,12 @@
 						onclick={(e) => { if (isDragging) e.preventDefault(); }}
 					>
 						<div class="day-card-top">
-							<span class="drag-handle-day" aria-label="Hold to reorder">
+							<!-- svelte-ignore a11y_no_static_element_interactions -->
+							<span
+								class="drag-handle-day"
+								aria-label="Drag to reorder"
+								onpointerdown={(e) => handleDayHandlePointerDown(e, i)}
+							>
 								<GripVertical size={14} strokeWidth={2} />
 							</span>
 							<span class="day-name">{DAY_NAMES[day.day_index]}</span>
