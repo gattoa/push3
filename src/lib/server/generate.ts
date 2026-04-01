@@ -134,7 +134,7 @@ function buildSystemPrompt(): string {
 
 ## Rules
 1. Generate exactly 7 days (day_index 0-6, Monday-Sunday). Non-training days should have split_label "Rest" and empty exercises array.
-2. Assign workouts to the athlete's specified training day indices. All other days are Rest. If the plan is generated mid-week, do not schedule training on days that have already passed. Distribute the athlete's training volume across the remaining available days. Always generate a plan regardless of how many days remain — even a single training day has value.
+2. Assign workouts to ALL of the athlete's specified training day indices. All other days are Rest. Always generate the full 7-day plan with every selected training day populated — regardless of what day of the week the plan is generated. Do NOT skip or redistribute training days based on the current day of the week. The plan represents the athlete's weekly structure and must match their day preferences exactly.
 3. Only use exercises from the provided exercise catalog. Every exercise_id must exist in the catalog.
 4. For Week 1 (cold start) or any exercise without an established performance baseline: set target_weight to null. The athlete will log their working weight to establish a baseline.
 5. For Week 2+ with baselines: prescribe target_weight based on historical performance.
@@ -216,11 +216,7 @@ function buildUserMessage(
 
 	const age = user_settings.date_of_birth ? calculateAge(user_settings.date_of_birth) : null;
 
-	// Mid-week awareness: tell the trainer what day it is
 	const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-	const jsDay = new Date().getDay();
-	const todayIndex = jsDay === 0 ? 6 : jsDay - 1; // Convert to 0=Mon scheme
-	const daysRemaining = 7 - todayIndex;
 
 	let msg = `## Athlete Profile
 - Date of birth: ${user_settings.date_of_birth ?? 'Not provided'}
@@ -233,8 +229,6 @@ function buildUserMessage(
 - Session duration: ${user_settings.session_duration_minutes} minutes
 - Unit preference: ${user_settings.unit_pref}
 - Injuries: ${user_settings.injuries.length > 0 ? user_settings.injuries.join(', ') : 'None'}
-- Today: ${DAY_NAMES[todayIndex]} (day_index ${todayIndex})
-- Days remaining this week: ${daysRemaining}
 
 ## Week Number: ${next_week_number}
 ${next_week_number === 1 ? '**This is Week 1 (cold start). Set ALL target_weight values to null.**' : ''}

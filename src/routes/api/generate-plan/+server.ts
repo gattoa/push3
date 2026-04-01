@@ -7,6 +7,9 @@ import { computeAlternativesForPlan } from '$lib/server/alternatives';
 // GET — Check if a plan already exists (used for phone-sleep recovery)
 // ============================================================================
 
+// Vercel Hobby plan defaults to 10s — Claude calls take 10-20s
+export const config = { maxDuration: 60 };
+
 export const GET: RequestHandler = async ({ locals: { safeGetSession, supabase } }) => {
 	const { user } = await safeGetSession();
 	if (!user) return json({ error: 'Not authenticated' }, { status: 401 });
@@ -52,10 +55,10 @@ export const POST: RequestHandler = async ({ locals: { safeGetSession, supabase 
 
 	if (recentPlan) {
 		const elapsed = Date.now() - new Date(recentPlan.created_at).getTime();
-		if (elapsed < 60_000) {
-			const waitSeconds = Math.ceil((60_000 - elapsed) / 1000);
+		if (elapsed < 300_000) {
+			const waitMinutes = Math.ceil((300_000 - elapsed) / 60_000);
 			return json(
-				{ error: `Please wait ${waitSeconds} seconds before generating another plan.` },
+				{ error: `Please wait ${waitMinutes} minute${waitMinutes === 1 ? '' : 's'} before generating another plan.` },
 				{ status: 429 }
 			);
 		}
@@ -65,8 +68,11 @@ export const POST: RequestHandler = async ({ locals: { safeGetSession, supabase 
 		const result = await generatePlan(supabase, user.id);
 
 		if ('error' in result) {
-			// Distinguish client vs server errors
-			const isClientError = result.error.includes('already exists') || result.error.includes('No exercises found');
+			// If a plan already exists, return its status so the client can poll
+			if (result.error.includes('already exists')) {
+				return json({ status: 'exists', message: result.error }, { status: 409 });
+			}
+			const isClientError = result.error.includes('No exercises found');
 			return json({ error: result.error }, { status: isClientError ? 409 : 500 });
 		}
 

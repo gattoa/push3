@@ -79,6 +79,6 @@ export const actions: Actions = {
 			return fail(500, { message: 'Failed to save settings. Please try again.' });
 		}
 
-		redirect(303, '/plan/generate');
+		redirect(303, '/plan');
 	}
 };

@@ -1,8 +1,8 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals: { safeGetSession } }) => {
-	const { user } = await safeGetSession();
-	if (!user) redirect(303, '/');
-	return {};
+// The blocking generate page has been replaced by async generation on /plan.
+// This redirect catches bookmarks, stale links, and browser back button.
+export const load: PageServerLoad = async () => {
+	redirect(303, '/plan');
 };
