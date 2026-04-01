@@ -2,7 +2,7 @@
 	import type { FullPlan, FullPlanDay } from '$lib/types/database';
 	import SegmentedControl from '$lib/components/SegmentedControl.svelte';
 	import PlanSkeleton from '$lib/components/PlanSkeleton.svelte';
-	import { ClipboardCheck } from 'lucide-svelte';
+	import { ClipboardCheck, GripVertical } from 'lucide-svelte';
 	import { page } from '$app/state';
 	import { invalidateAll } from '$app/navigation';
 	import { onDestroy } from 'svelte';
@@ -144,6 +144,119 @@
 		}
 		return { done, total };
 	}
+
+	// ── Day Drag-to-Swap State ────────────────────────────────
+	let draggedDayIndex = $state<number | null>(null);
+	let dragOverDayIndex = $state<number | null>(null);
+	let longPressTimer = $state<ReturnType<typeof setTimeout> | null>(null);
+	let isDragging = $state(false);
+	let dragStartY = $state(0);
+	let swapping = $state(false);
+
+	function handleDayPointerDown(e: PointerEvent, dayIdx: number) {
+		const tag = (e.target as HTMLElement).tagName;
+		if (tag === 'INPUT' || tag === 'BUTTON') return;
+
+		const startY = e.clientY;
+		dragStartY = startY;
+
+		longPressTimer = setTimeout(() => {
+			e.preventDefault();
+			isDragging = true;
+			draggedDayIndex = dayIdx;
+			if (navigator.vibrate) navigator.vibrate(10);
+		}, 300);
+	}
+
+	function handleDayPointerMove(e: PointerEvent) {
+		if (longPressTimer && !isDragging) {
+			const dy = Math.abs(e.clientY - dragStartY);
+			if (dy > 8) {
+				clearTimeout(longPressTimer);
+				longPressTimer = null;
+			}
+			return;
+		}
+		if (!isDragging || draggedDayIndex === null) return;
+		e.preventDefault();
+
+		// Determine which card we're over
+		const cards = document.querySelectorAll('.day-drop-zone');
+		for (let i = 0; i < cards.length; i++) {
+			const rect = cards[i].getBoundingClientRect();
+			if (e.clientY >= rect.top && e.clientY <= rect.bottom) {
+				dragOverDayIndex = i;
+				return;
+			}
+		}
+	}
+
+	async function handleDayPointerUp(e: PointerEvent) {
+		if (longPressTimer) {
+			clearTimeout(longPressTimer);
+			longPressTimer = null;
+		}
+		if (!isDragging || draggedDayIndex === null) {
+			isDragging = false;
+			draggedDayIndex = null;
+			dragOverDayIndex = null;
+			return;
+		}
+
+		const fromIdx = draggedDayIndex;
+		const toIdx = dragOverDayIndex;
+
+		isDragging = false;
+		draggedDayIndex = null;
+		dragOverDayIndex = null;
+
+		if (toIdx === null || toIdx === fromIdx || swapping) return;
+
+		const dayA = sortedDays[fromIdx];
+		const dayB = sortedDays[toIdx];
+		if (!dayA || !dayB) return;
+
+		swapping = true;
+
+		// Optimistic swap
+		const tempDayIndex = dayA.day_index;
+		dayA.day_index = dayB.day_index;
+		dayB.day_index = tempDayIndex;
+
+		try {
+			const res = await fetch('/api/swap-days', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ day_id_a: dayA.id, day_id_b: dayB.id })
+			});
+
+			if (res.ok) {
+				await invalidateAll();
+				addToast(`Swapped ${DAY_NAMES[dayB.day_index]} ↔ ${DAY_NAMES[dayA.day_index]}`, 'success');
+			} else {
+				// Revert
+				dayB.day_index = dayA.day_index;
+				dayA.day_index = tempDayIndex;
+				addToast('Swap failed — try again', 'error');
+			}
+		} catch {
+			dayB.day_index = dayA.day_index;
+			dayA.day_index = tempDayIndex;
+			addToast('Network error — check your connection', 'error');
+		} finally {
+			swapping = false;
+		}
+	}
+
+	function handleDayPointerCancel() {
+		if (longPressTimer) {
+			clearTimeout(longPressTimer);
+			longPressTimer = null;
+		}
+		isDragging = false;
+		draggedDayIndex = null;
+		dragOverDayIndex = null;
+	}
 </script>
 
 <svelte:head>
@@ -162,54 +275,77 @@
 
 	{#if plan}
 		<!-- ═══ Active plan ═══ -->
-		<div class="day-list">
-			{#each sortedDays as day}
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div
+			class="day-list"
+			onpointermove={isDragging ? handleDayPointerMove : undefined}
+			onpointerup={isDragging ? handleDayPointerUp : undefined}
+			onpointercancel={isDragging ? handleDayPointerCancel : undefined}
+		>
+			{#each sortedDays as day, i}
 				{@const progress = getDayProgress(day)}
 				{@const isToday = day.day_index === todayIndex}
 				{@const isRest = day.exercises.length === 0}
 				{@const isComplete = progress.total > 0 && progress.done === progress.total}
-				<a
-					href="/workout/{day.day_index}"
-					class="day-card"
-					class:today={isToday}
-					class:rest={isRest}
-					class:complete={isComplete}
+				{@const isBeingDragged = isDragging && draggedDayIndex === i}
+				{@const isDragTarget = isDragging && dragOverDayIndex === i && draggedDayIndex !== i}
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div
+					class="day-card-wrap day-drop-zone"
+					class:dragging={isBeingDragged}
+					class:drag-target={isDragTarget}
+					onpointerdown={(e) => handleDayPointerDown(e, i)}
+					onpointermove={handleDayPointerMove}
+					onpointerup={handleDayPointerUp}
+					onpointercancel={handleDayPointerCancel}
 				>
-					<div class="day-card-top">
-						<span class="day-name">{DAY_NAMES[day.day_index]}</span>
-						{#if isToday}
-							<span class="today-badge">Today</span>
-						{/if}
-					</div>
-
-					{#if isRest}
-						<span class="rest-label">Rest Day</span>
-					{:else}
-						<span class="split-label">{day.split_label}</span>
-						<div class="day-card-stats">
-							<span>{day.exercises.length} exercises</span>
-							<span class="dot-sep">&middot;</span>
-							<span>{progress.total} sets</span>
+					<a
+						href={isDragging ? undefined : `/workout/${day.day_index}`}
+						class="day-card"
+						class:today={isToday}
+						class:rest={isRest}
+						class:complete={isComplete}
+						onclick={(e) => { if (isDragging) e.preventDefault(); }}
+					>
+						<div class="day-card-top">
+							<span class="drag-handle-day" aria-label="Hold to reorder">
+								<GripVertical size={14} strokeWidth={2} />
+							</span>
+							<span class="day-name">{DAY_NAMES[day.day_index]}</span>
+							{#if isToday}
+								<span class="today-badge">Today</span>
+							{/if}
 						</div>
-						{#if progress.total > 0}
-							<div class="mini-progress">
-								<div class="mini-progress-bar">
-									<div
-										class="mini-progress-fill"
-										style="width: {(progress.done / progress.total) * 100}%"
-									></div>
-								</div>
-								<span class="mini-progress-text">
-									{#if isComplete}
-										&#10003;
-									{:else}
-										{progress.done}/{progress.total}
-									{/if}
-								</span>
+
+						{#if isRest}
+							<span class="rest-label">Rest Day</span>
+						{:else}
+							<span class="split-label">{day.split_label}</span>
+							<div class="day-card-stats">
+								<span>{day.exercises.length} exercises</span>
+								<span class="dot-sep">&middot;</span>
+								<span>{progress.total} sets</span>
 							</div>
+							{#if progress.total > 0}
+								<div class="mini-progress">
+									<div class="mini-progress-bar">
+										<div
+											class="mini-progress-fill"
+											style="width: {(progress.done / progress.total) * 100}%"
+										></div>
+									</div>
+									<span class="mini-progress-text">
+										{#if isComplete}
+											&#10003;
+										{:else}
+											{progress.done}/{progress.total}
+										{/if}
+									</span>
+								</div>
+							{/if}
 						{/if}
-					{/if}
-				</a>
+					</a>
+				</div>
 			{/each}
 		</div>
 
@@ -372,6 +508,40 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
+		touch-action: pan-y;
+	}
+
+	.day-card-wrap {
+		position: relative;
+		transition: transform var(--duration-normal) var(--ease-out),
+			opacity var(--duration-normal) var(--ease-out);
+	}
+
+	.day-card-wrap.dragging {
+		opacity: 0.4;
+		transform: scale(0.97);
+	}
+
+	.day-card-wrap.drag-target {
+		transform: scale(1.02);
+	}
+
+	.day-card-wrap.drag-target .day-card {
+		border-color: var(--color-activity);
+		box-shadow: 0 0 0 1px var(--color-activity), var(--shadow-md);
+	}
+
+	.drag-handle-day {
+		display: flex;
+		align-items: center;
+		color: var(--color-text-tertiary);
+		flex-shrink: 0;
+		touch-action: none;
+		cursor: grab;
+	}
+
+	.drag-handle-day:active {
+		cursor: grabbing;
 	}
 
 	.day-card {
