@@ -25,17 +25,45 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
 	const jsDay = new Date().getDay();
 	const todayIndex = jsDay === 0 ? 6 : jsDay - 1;
 
-	// Check if any previous plan exists (to determine if this is Week 1)
+	// If no active plan, check if one is currently generating
+	let generationStatus: 'none' | 'generating' | 'ready' = fullPlan ? 'ready' : 'none';
 	let hasPreviousPlan = false;
+	let trainingDays: number[] = [];
+
 	if (!fullPlan) {
+		// Check for a plan that's currently being generated
+		const { data: generatingPlan } = await supabase
+			.from('weekly_plans')
+			.select('id, status')
+			.eq('user_id', user.id)
+			.eq('week_start_date', currentMonday)
+			.eq('status', 'generating')
+			.limit(1)
+			.maybeSingle();
+
+		if (generatingPlan) {
+			generationStatus = 'generating';
+		}
+
+		// Check for any previous completed plan
 		const { data: anyPlan } = await supabase
 			.from('weekly_plans')
 			.select('id')
 			.eq('user_id', user.id)
+			.in('status', ['active', 'completed'])
 			.limit(1)
 			.maybeSingle();
 		hasPreviousPlan = !!anyPlan;
 	}
 
-	return { fullPlan, todayIndex, hasPreviousPlan };
+	// Fetch training days for skeleton display
+	const { data: settings } = await supabase
+		.from('user_settings')
+		.select('training_days')
+		.eq('user_id', user.id)
+		.single();
+
+	trainingDays = settings?.training_days ?? [];
+
+	return { fullPlan, todayIndex, hasPreviousPlan, generationStatus, trainingDays };
 };

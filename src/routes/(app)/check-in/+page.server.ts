@@ -127,7 +127,7 @@ export const actions: Actions = {
 			return fail(500, { error: 'Failed to finalize plan. Check-in was saved — please try again.' });
 		}
 
-		// 4. Redirect to plan generation
-		redirect(303, '/plan/generate');
+		// 4. Redirect to plan page (generation happens async)
+		redirect(303, '/plan');
 	}
 };

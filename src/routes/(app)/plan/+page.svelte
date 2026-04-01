@@ -1,17 +1,132 @@
 <script lang="ts">
 	import type { FullPlan, FullPlanDay } from '$lib/types/database';
 	import SegmentedControl from '$lib/components/SegmentedControl.svelte';
-	import { ClipboardCheck, Play } from 'lucide-svelte';
+	import PlanSkeleton from '$lib/components/PlanSkeleton.svelte';
+	import { ClipboardCheck } from 'lucide-svelte';
 	import { page } from '$app/state';
+	import { invalidateAll } from '$app/navigation';
+	import { onDestroy } from 'svelte';
+	import { addToast } from '$lib/stores/toast.svelte';
 	import AvatarMenu from '$lib/components/AvatarMenu.svelte';
 
 	let { data } = $props();
 	const plan = $derived(data.fullPlan as FullPlan | null);
 	const todayIndex = $derived(data.todayIndex as number);
 	const hasPreviousPlan = $derived(data.hasPreviousPlan as boolean);
+	const serverGenStatus = $derived(data.generationStatus as 'none' | 'generating' | 'ready');
+	const trainingDays = $derived(data.trainingDays as number[]);
 
 	const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
+	// ── Generation state ──────────────────────────────────────
+	let genState = $state<'idle' | 'generating' | 'error'>('idle');
+	let genError = $state('');
+	let pollTimer: ReturnType<typeof setInterval> | null = null;
+	let pollCount = $state(0);
+	const MAX_POLLS = 20; // 20 × 3s = 60s timeout
+
+	const isGenerating = $derived(genState === 'generating');
+
+	// On mount: if server says generating or no plan exists (and no previous plan to check-in from), start generation
+	$effect(() => {
+		if (plan) {
+			// Plan exists — nothing to do
+			genState = 'idle';
+			return;
+		}
+
+		if (serverGenStatus === 'generating') {
+			// Plan is already being generated server-side — just poll
+			genState = 'generating';
+			startPolling();
+		} else if (serverGenStatus === 'none' && !hasPreviousPlan) {
+			// First-time user with no plan — trigger generation
+			triggerGeneration();
+		}
+	});
+
+	onDestroy(() => {
+		stopPolling();
+	});
+
+	async function triggerGeneration() {
+		genState = 'generating';
+		genError = '';
+		pollCount = 0;
+
+		try {
+			const res = await fetch('/api/generate-plan', { method: 'POST' });
+			const data = await res.json();
+
+			if (!res.ok) {
+				// 409 = plan already exists or is generating — just poll for it
+				if (res.status === 409) {
+					startPolling();
+					return;
+				}
+				// 429 = rate limited
+				if (res.status === 429) {
+					genState = 'error';
+					genError = data.error || 'Please wait before generating another plan.';
+					return;
+				}
+				genState = 'error';
+				genError = data.error || 'Generation failed. Please try again.';
+				return;
+			}
+
+			// POST succeeded — plan should be saving. Poll for active status.
+			startPolling();
+		} catch {
+			// Network error — plan might still be generating server-side. Poll to check.
+			startPolling();
+		}
+	}
+
+	function startPolling() {
+		stopPolling();
+		pollCount = 0;
+		pollTimer = setInterval(pollForPlan, 3000);
+	}
+
+	function stopPolling() {
+		if (pollTimer) {
+			clearInterval(pollTimer);
+			pollTimer = null;
+		}
+	}
+
+	async function pollForPlan() {
+		pollCount++;
+
+		if (pollCount > MAX_POLLS) {
+			stopPolling();
+			genState = 'error';
+			genError = 'Plan generation is taking longer than expected. Please refresh the page.';
+			return;
+		}
+
+		try {
+			const res = await fetch('/api/generate-plan');
+			const data = await res.json();
+
+			if (data.plan && data.plan.status === 'active') {
+				stopPolling();
+				genState = 'idle';
+				await invalidateAll();
+				addToast('Your plan is ready!', 'success');
+			}
+		} catch {
+			// Poll failed — keep trying
+		}
+	}
+
+	async function retryGeneration() {
+		genError = '';
+		triggerGeneration();
+	}
+
+	// ── Plan display helpers ──────────────────────────────────
 	let sortedDays = $derived(
 		plan ? [...plan.days].sort((a, b) => a.day_index - b.day_index) : []
 	);
@@ -29,7 +144,6 @@
 		}
 		return { done, total };
 	}
-
 </script>
 
 <svelte:head>
@@ -47,6 +161,7 @@
 	</header>
 
 	{#if plan}
+		<!-- ═══ Active plan ═══ -->
 		<div class="day-list">
 			{#each sortedDays as day}
 				{@const progress = getDayProgress(day)}
@@ -97,33 +212,42 @@
 				</a>
 			{/each}
 		</div>
-	{:else}
+
+	{:else if isGenerating}
+		<!-- ═══ Generating state: status card + skeleton ═══ -->
+		<div class="gen-status">
+			<div class="gen-pulse"></div>
+			<div class="gen-text">
+				<p class="gen-title">Building your plan...</p>
+				<p class="gen-subtitle">This usually takes about 15 seconds.</p>
+			</div>
+		</div>
+		<PlanSkeleton {trainingDays} />
+
+	{:else if genState === 'error'}
+		<!-- ═══ Generation error ═══ -->
+		<div class="gen-error">
+			<p class="gen-error-msg">{genError}</p>
+			<button class="gen-retry-btn" onclick={retryGeneration}>Try Again</button>
+		</div>
+		<PlanSkeleton {trainingDays} />
+
+	{:else if hasPreviousPlan}
+		<!-- ═══ Returning user: needs check-in before new plan ═══ -->
 		<div class="empty-state">
 			<div class="empty-icon">
-				{#if hasPreviousPlan}
-					<ClipboardCheck size={32} />
-				{:else}
-					<Play size={32} />
-				{/if}
+				<ClipboardCheck size={32} />
 			</div>
 			<h2 class="empty-title">No plan for this week</h2>
-			<p class="empty-desc">
-				{#if hasPreviousPlan}
-					Check in on last week to generate your next plan.
-				{:else}
-					Generate your first training plan to get started.
-				{/if}
-			</p>
-			<a
-				href={hasPreviousPlan ? '/check-in' : '/plan/generate'}
-				class="empty-cta"
-			>
-				{#if hasPreviousPlan}
-					Check In
-				{:else}
-					Generate Plan
-				{/if}
-			</a>
+			<p class="empty-desc">Check in on last week to generate your next plan.</p>
+			<a href="/check-in" class="empty-cta">Check In</a>
+		</div>
+
+	{:else}
+		<!-- ═══ Fallback empty state ═══ -->
+		<div class="empty-state">
+			<h2 class="empty-title">No plan for this week</h2>
+			<p class="empty-desc">Complete onboarding to get your first training plan.</p>
 		</div>
 	{/if}
 </div>
@@ -163,7 +287,87 @@
 		text-align: center;
 	}
 
-	/* Day cards */
+	/* ── Generation status card ── */
+	.gen-status {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+		background: var(--color-surface);
+		border: 1.5px solid var(--color-activity-muted);
+		border-radius: var(--radius);
+		padding: var(--space-4);
+		margin-bottom: var(--space-3);
+	}
+
+	.gen-pulse {
+		width: 12px;
+		height: 12px;
+		border-radius: var(--radius-full);
+		background: var(--color-activity);
+		flex-shrink: 0;
+		animation: pulse 1.5s ease-in-out infinite;
+	}
+
+	@keyframes pulse {
+		0%, 100% { opacity: 1; transform: scale(1); }
+		50% { opacity: 0.4; transform: scale(0.85); }
+	}
+
+	.gen-text {
+		flex: 1;
+	}
+
+	.gen-title {
+		font-family: var(--font-display);
+		font-size: var(--text-sm);
+		font-weight: var(--weight-semibold);
+		color: var(--color-text);
+		margin-bottom: 0.1rem;
+	}
+
+	.gen-subtitle {
+		font-size: var(--text-xs);
+		color: var(--color-text-secondary);
+	}
+
+	/* ── Generation error ── */
+	.gen-error {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-3);
+		background: var(--color-surface);
+		border: 1.5px solid var(--color-danger-muted);
+		border-radius: var(--radius);
+		padding: var(--space-4);
+		margin-bottom: var(--space-3);
+	}
+
+	.gen-error-msg {
+		font-size: var(--text-sm);
+		color: var(--color-text-secondary);
+		line-height: var(--leading-normal);
+	}
+
+	.gen-retry-btn {
+		flex-shrink: 0;
+		padding: var(--space-2) var(--space-4);
+		background: var(--color-surface-hover);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		color: var(--color-text);
+		font-family: var(--font-body);
+		font-size: var(--text-xs);
+		font-weight: var(--weight-semibold);
+		cursor: pointer;
+		transition: background var(--duration-normal) var(--ease-out);
+	}
+
+	.gen-retry-btn:hover {
+		background: var(--color-surface-active);
+	}
+
+	/* ── Day cards ── */
 	.day-list {
 		display: flex;
 		flex-direction: column;
@@ -282,7 +486,7 @@
 		color: var(--color-accent);
 	}
 
-	/* Empty state */
+	/* ── Empty state ── */
 	.empty-state {
 		display: flex;
 		flex-direction: column;
