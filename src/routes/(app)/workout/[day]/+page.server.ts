@@ -1,16 +1,7 @@
 import { redirect, error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { getFullPlan, getExerciseHistory } from '$lib/server/supabase';
-
-/** Compute Monday of the current calendar week (ISO: Monday = start of week) */
-function getCurrentMonday(): string {
-	const now = new Date();
-	const jsDay = now.getDay(); // 0=Sun
-	const mondayOffset = jsDay === 0 ? -6 : 1 - jsDay;
-	const monday = new Date(now);
-	monday.setDate(now.getDate() + mondayOffset);
-	return monday.toISOString().split('T')[0];
-}
+import { getCurrentMonday } from '$lib/utils/date';
 
 export const load: PageServerLoad = async ({ params, locals: { safeGetSession, supabase } }) => {
 	const { user } = await safeGetSession();
