@@ -2,7 +2,7 @@
 	import type { FullPlan, FullPlanDay } from '$lib/types/database';
 	import SegmentedControl from '$lib/components/SegmentedControl.svelte';
 	import PlanSkeleton from '$lib/components/PlanSkeleton.svelte';
-	import { ClipboardCheck } from 'lucide-svelte';
+	import { ClipboardCheck, Check } from 'lucide-svelte';
 	import { page } from '$app/state';
 	import { invalidateAll } from '$app/navigation';
 	import { onDestroy } from 'svelte';
@@ -293,9 +293,14 @@
 							<div class="day-arc-wrap">
 								<svg class="day-arc" viewBox="0 0 52 32" fill="none">
 									<path d="M 4 28 A {ARC_R} {ARC_R} 0 0 1 48 28" stroke="var(--color-border)" stroke-width="3" stroke-linecap="round" fill="none" />
-									<path d="M 4 28 A {ARC_R} {ARC_R} 0 0 1 48 28" stroke={isComplete && progress.hasPR ? 'var(--color-celebrate)' : 'var(--color-activity)'} stroke-width="3" stroke-linecap="round" fill="none" stroke-dasharray={ARC_C} stroke-dashoffset={ARC_C * (1 - progress.done / progress.total)} class="arc-fill" />
+									<path d="M 4 28 A {ARC_R} {ARC_R} 0 0 1 48 28" stroke={isComplete ? 'var(--color-celebrate)' : 'var(--color-activity)'} stroke-width="3" stroke-linecap="round" fill="none" stroke-dasharray={ARC_C} stroke-dashoffset={ARC_C * (1 - progress.done / progress.total)} class="arc-fill" />
 								</svg>
-								<span class="day-arc-label" class:complete={isComplete} class:has-pr={isComplete && progress.hasPR}>
+								{#if isComplete}
+									<span class="day-arc-icon">
+										<Check size={14} strokeWidth={3} />
+									</span>
+								{/if}
+								<span class="day-arc-label" class:complete={isComplete}>
 									{#if isComplete}Done{:else}{progress.done}/{progress.total}{/if}
 								</span>
 							</div>
@@ -332,9 +337,14 @@
 							<div class="day-arc-wrap">
 								<svg class="day-arc" viewBox="0 0 52 32" fill="none">
 									<path d="M 4 28 A {ARC_R} {ARC_R} 0 0 1 48 28" stroke="var(--color-border)" stroke-width="3" stroke-linecap="round" fill="none" />
-									<path d="M 4 28 A {ARC_R} {ARC_R} 0 0 1 48 28" stroke={isComplete && progress.hasPR ? 'var(--color-celebrate)' : 'var(--color-activity)'} stroke-width="3" stroke-linecap="round" fill="none" stroke-dasharray={ARC_C} stroke-dashoffset={ARC_C * (1 - progress.done / progress.total)} class="arc-fill" />
+									<path d="M 4 28 A {ARC_R} {ARC_R} 0 0 1 48 28" stroke={isComplete ? 'var(--color-celebrate)' : 'var(--color-activity)'} stroke-width="3" stroke-linecap="round" fill="none" stroke-dasharray={ARC_C} stroke-dashoffset={ARC_C * (1 - progress.done / progress.total)} class="arc-fill" />
 								</svg>
-								<span class="day-arc-label" class:complete={isComplete} class:has-pr={isComplete && progress.hasPR}>
+								{#if isComplete}
+									<span class="day-arc-icon">
+										<Check size={14} strokeWidth={3} />
+									</span>
+								{/if}
+								<span class="day-arc-label" class:complete={isComplete}>
 									{#if isComplete}Done{:else}{progress.done}/{progress.total}{/if}
 								</span>
 							</div>
@@ -656,17 +666,29 @@
 	.day-arc-wrap {
 		position: relative;
 		width: 48px;
-		height: 28px;
+		height: 44px;
 		flex-shrink: 0;
 	}
 
 	.day-arc {
 		width: 100%;
-		height: 100%;
+		height: 28px;
+		display: block;
 	}
 
 	.arc-fill {
 		transition: stroke-dashoffset var(--duration-slow) var(--ease-out);
+	}
+
+	.day-arc-icon {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		position: absolute;
+		top: 14px;
+		left: 50%;
+		transform: translateX(-50%);
+		color: var(--color-activity);
 	}
 
 	.day-arc-label {
@@ -687,12 +709,9 @@
 		font-weight: var(--weight-semibold);
 		letter-spacing: var(--tracking-wide);
 		text-transform: uppercase;
-		color: var(--color-activity);
+		color: var(--color-text-tertiary);
 	}
 
-	.day-arc-label.has-pr {
-		color: var(--color-celebrate);
-	}
 
 	/* ── Empty state ── */
 	.empty-state {
