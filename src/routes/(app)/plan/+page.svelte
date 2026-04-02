@@ -270,34 +270,34 @@
 						onclick={() => handleDayTap(day)}
 						disabled={swapping}
 					>
-						<div class="day-card-top">
-							<span class="day-name">{DAY_NAMES[day.day_index]}</span>
-							{#if isToday}
-								<span class="today-badge">Today</span>
-							{/if}
-						</div>
+						<div class="day-card-content">
+							<div class="day-card-top">
+								<span class="day-name">{DAY_NAMES[day.day_index]}</span>
+								{#if isToday}
+									<span class="today-badge">Today</span>
+								{/if}
+							</div>
 
-						{#if isRest}
-							<span class="rest-label">Rest Day</span>
-						{:else}
-							<span class="split-label">{day.split_label}</span>
-							<div class="day-card-bottom">
+							{#if isRest}
+								<span class="rest-label">Rest Day</span>
+							{:else}
+								<span class="split-label">{day.split_label}</span>
 								<div class="day-card-stats">
 									<span>{day.exercises.length} exercises</span>
 									<span class="dot-sep">&middot;</span>
 									<span>{progress.total} sets</span>
 								</div>
-								{#if progress.done > 0}
-									<div class="day-arc-wrap">
-										<svg class="day-arc" viewBox="0 0 40 24" fill="none">
-											<path d="M 2 22 A {ARC_R} {ARC_R} 0 0 1 38 22" stroke="var(--color-border)" stroke-width="2.5" stroke-linecap="round" fill="none" />
-											<path d="M 2 22 A {ARC_R} {ARC_R} 0 0 1 38 22" stroke={isComplete && progress.hasPR ? 'var(--color-celebrate)' : 'var(--color-activity)'} stroke-width="2.5" stroke-linecap="round" fill="none" stroke-dasharray={ARC_C} stroke-dashoffset={ARC_C * (1 - progress.done / progress.total)} class="arc-fill" />
-										</svg>
-										<span class="day-arc-label" class:complete={isComplete} class:has-pr={isComplete && progress.hasPR}>
-											{#if isComplete}&#10003;{:else}{progress.done}/{progress.total}{/if}
-										</span>
-									</div>
-								{/if}
+							{/if}
+						</div>
+						{#if !isRest && progress.done > 0}
+							<div class="day-arc-wrap">
+								<svg class="day-arc" viewBox="0 0 40 24" fill="none">
+									<path d="M 2 22 A {ARC_R} {ARC_R} 0 0 1 38 22" stroke="var(--color-border)" stroke-width="2.5" stroke-linecap="round" fill="none" />
+									<path d="M 2 22 A {ARC_R} {ARC_R} 0 0 1 38 22" stroke={isComplete && progress.hasPR ? 'var(--color-celebrate)' : 'var(--color-activity)'} stroke-width="2.5" stroke-linecap="round" fill="none" stroke-dasharray={ARC_C} stroke-dashoffset={ARC_C * (1 - progress.done / progress.total)} class="arc-fill" />
+								</svg>
+								<span class="day-arc-label" class:complete={isComplete} class:has-pr={isComplete && progress.hasPR}>
+									{#if isComplete}&#10003;{:else}{progress.done}/{progress.total}{/if}
+								</span>
 							</div>
 						{/if}
 					</button>
@@ -309,34 +309,34 @@
 						class:rest={isRest}
 						class:complete={isComplete}
 					>
-						<div class="day-card-top">
-							<span class="day-name">{DAY_NAMES[day.day_index]}</span>
-							{#if isToday}
-								<span class="today-badge">Today</span>
-							{/if}
-						</div>
+						<div class="day-card-content">
+							<div class="day-card-top">
+								<span class="day-name">{DAY_NAMES[day.day_index]}</span>
+								{#if isToday}
+									<span class="today-badge">Today</span>
+								{/if}
+							</div>
 
-						{#if isRest}
-							<span class="rest-label">Rest Day</span>
-						{:else}
-							<span class="split-label">{day.split_label}</span>
-							<div class="day-card-bottom">
+							{#if isRest}
+								<span class="rest-label">Rest Day</span>
+							{:else}
+								<span class="split-label">{day.split_label}</span>
 								<div class="day-card-stats">
 									<span>{day.exercises.length} exercises</span>
 									<span class="dot-sep">&middot;</span>
 									<span>{progress.total} sets</span>
 								</div>
-								{#if progress.done > 0}
-									<div class="day-arc-wrap">
-										<svg class="day-arc" viewBox="0 0 40 24" fill="none">
-											<path d="M 2 22 A {ARC_R} {ARC_R} 0 0 1 38 22" stroke="var(--color-border)" stroke-width="2.5" stroke-linecap="round" fill="none" />
-											<path d="M 2 22 A {ARC_R} {ARC_R} 0 0 1 38 22" stroke={isComplete && progress.hasPR ? 'var(--color-celebrate)' : 'var(--color-activity)'} stroke-width="2.5" stroke-linecap="round" fill="none" stroke-dasharray={ARC_C} stroke-dashoffset={ARC_C * (1 - progress.done / progress.total)} class="arc-fill" />
-										</svg>
-										<span class="day-arc-label" class:complete={isComplete} class:has-pr={isComplete && progress.hasPR}>
-											{#if isComplete}&#10003;{:else}{progress.done}/{progress.total}{/if}
-										</span>
-									</div>
-								{/if}
+							{/if}
+						</div>
+						{#if !isRest && progress.done > 0}
+							<div class="day-arc-wrap">
+								<svg class="day-arc" viewBox="0 0 40 24" fill="none">
+									<path d="M 2 22 A {ARC_R} {ARC_R} 0 0 1 38 22" stroke="var(--color-border)" stroke-width="2.5" stroke-linecap="round" fill="none" />
+									<path d="M 2 22 A {ARC_R} {ARC_R} 0 0 1 38 22" stroke={isComplete && progress.hasPR ? 'var(--color-celebrate)' : 'var(--color-activity)'} stroke-width="2.5" stroke-linecap="round" fill="none" stroke-dasharray={ARC_C} stroke-dashoffset={ARC_C * (1 - progress.done / progress.total)} class="arc-fill" />
+								</svg>
+								<span class="day-arc-label" class:complete={isComplete} class:has-pr={isComplete && progress.hasPR}>
+									{#if isComplete}&#10003;{:else}{progress.done}/{progress.total}{/if}
+								</span>
 							</div>
 						{/if}
 					</a>
@@ -554,7 +554,9 @@
 	}
 
 	.day-card {
-		display: block;
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
 		width: 100%;
 		text-align: left;
 		font: inherit;
@@ -647,11 +649,9 @@
 	}
 
 	/* Mini progress bar */
-	.day-card-bottom {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: var(--space-2);
+	.day-card-content {
+		flex: 1;
+		min-width: 0;
 	}
 
 	.day-arc-wrap {
