@@ -383,6 +383,18 @@
 				</button>
 			{/each}
 		</div>
+		<div class="check-in-row">
+			<span class="check-in-label">Check in on</span>
+			<select
+				class="check-in-select"
+				value={checkInDay}
+				onchange={(e) => setCheckInDay(parseInt(e.currentTarget.value, 10))}
+			>
+				{#each DAY_NAMES as name, i}
+					<option value={i}>{name}</option>
+				{/each}
+			</select>
+		</div>
 		<span class="sub-label">Session length</span>
 		<div class="duration-chips">
 			{#each durationOptions as dur}
@@ -395,18 +407,6 @@
 					{dur}m
 				</button>
 			{/each}
-		</div>
-		<div class="check-in-row">
-			<span class="check-in-label">Check in on</span>
-			<select
-				class="check-in-select"
-				value={checkInDay}
-				onchange={(e) => setCheckInDay(parseInt(e.currentTarget.value, 10))}
-			>
-				{#each DAY_NAMES as name, i}
-					<option value={i}>{name}</option>
-				{/each}
-			</select>
 		</div>
 	</div>
 
