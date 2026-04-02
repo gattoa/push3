@@ -95,15 +95,18 @@ export const POST: RequestHandler = async ({ request, locals: { safeGetSession, 
 	const idsA = (exA ?? []).map((e) => e.id);
 	const idsB = (exB ?? []).map((e) => e.id);
 
+	console.log(`[swap-days] Moving ${idsA.length} exercises from day ${dayA.day_index} → day ${dayB.day_index}, and ${idsB.length} exercises back`);
+
 	// Move A's exercises to B
 	if (idsA.length > 0) {
-		const { error } = await supabase
+		const { error, count } = await supabase
 			.from('planned_exercises')
 			.update({ day_id: dayB.id })
 			.in('id', idsA);
 
+		console.log(`[swap-days] A→B update: error=${error?.message ?? 'none'}, count=${count}`);
+
 		if (error) {
-			// Best-effort rollback labels
 			await supabase.from('planned_days').update({ split_label: dayA.split_label }).eq('id', dayA.id);
 			await supabase.from('planned_days').update({ split_label: dayB.split_label }).eq('id', dayB.id);
 			return json({ error: error.message }, { status: 500 });
@@ -112,13 +115,14 @@ export const POST: RequestHandler = async ({ request, locals: { safeGetSession, 
 
 	// Move B's exercises to A
 	if (idsB.length > 0) {
-		const { error } = await supabase
+		const { error, count } = await supabase
 			.from('planned_exercises')
 			.update({ day_id: dayA.id })
 			.in('id', idsB);
 
+		console.log(`[swap-days] B→A update: error=${error?.message ?? 'none'}, count=${count}`);
+
 		if (error) {
-			// Best-effort rollback: move A's exercises back
 			if (idsA.length > 0) {
 				await supabase.from('planned_exercises').update({ day_id: dayA.id }).in('id', idsA);
 			}
@@ -128,5 +132,27 @@ export const POST: RequestHandler = async ({ request, locals: { safeGetSession, 
 		}
 	}
 
-	return json({ success: true });
+	// Verify the swap
+	const { data: verifyA } = await supabase
+		.from('planned_exercises')
+		.select('id, exercise_name')
+		.eq('day_id', dayA.id);
+	const { data: verifyB } = await supabase
+		.from('planned_exercises')
+		.select('id, exercise_name')
+		.eq('day_id', dayB.id);
+	console.log(`[swap-days] After swap — Day ${dayA.day_index} (${dayB.split_label}):`, verifyA?.map(e => e.exercise_name));
+	console.log(`[swap-days] After swap — Day ${dayB.day_index} (${dayA.split_label}):`, verifyB?.map(e => e.exercise_name));
+
+	return json({
+		success: true,
+		debug: {
+			labelsSwapped: `${dayA.split_label} ↔ ${dayB.split_label}`,
+			exercisesMoved: { aToB: idsA.length, bToA: idsB.length },
+			verification: {
+				dayA: verifyA?.map(e => e.exercise_name) ?? [],
+				dayB: verifyB?.map(e => e.exercise_name) ?? []
+			}
+		}
+	});
 };

@@ -180,15 +180,20 @@
 				body: JSON.stringify({ day_id_a: idA, day_id_b: idB })
 			});
 
+			const data = await res.json();
+			console.log('[swap-days] Response:', JSON.stringify(data, null, 2));
+
 			if (res.ok) {
 				await invalidateAll();
 				if (dayA && dayB) {
 					addToast(`Swapped ${DAY_NAMES[dayA.day_index]} ↔ ${DAY_NAMES[dayB.day_index]}`, 'success');
 				}
 			} else {
+				console.error('[swap-days] Error:', data);
 				addToast('Swap failed — try again', 'error');
 			}
-		} catch {
+		} catch (err) {
+			console.error('[swap-days] Network error:', err);
 			addToast('Network error — check your connection', 'error');
 		} finally {
 			swapping = false;
