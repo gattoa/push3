@@ -30,7 +30,6 @@
 	let injuries = $state<string[]>([]);
 	let equipment = $state<string[]>([]);
 	let unitPref = $state<'lb' | 'kg'>('lb');
-	let checkInDay = $state(6);
 	let newInjury = $state('');
 
 	// Pre-fill from settings
@@ -41,7 +40,6 @@
 		experienceLevel = settings.experience_level ?? '';
 		trainingDays = [...settings.training_days];
 		sessionDuration = settings.session_duration_minutes;
-		checkInDay = settings.check_in_day ?? 6;
 		injuries = [...settings.injuries];
 		equipment = settings.equipment.filter((e: string) => e !== 'body weight');
 		unitPref = settings.unit_pref;
@@ -168,11 +166,6 @@
 		saveSettings({ session_duration_minutes: value });
 	}
 
-	function setCheckInDay(dayIndex: number) {
-		checkInDay = dayIndex;
-		saveSettings({ check_in_day: dayIndex });
-	}
-
 	function toggleTrainingDay(dayIndex: number) {
 		if (trainingDays.includes(dayIndex)) {
 			trainingDays = trainingDays.filter((d) => d !== dayIndex);
@@ -180,7 +173,10 @@
 			trainingDays = [...trainingDays, dayIndex].sort((a, b) => a - b);
 		}
 		if (trainingDays.length >= 2) {
-			debouncedSave({ training_days: trainingDays });
+			// Auto-compute check-in day: day after the last training day (wraps Sun→Mon)
+			const lastTrainingDay = Math.max(...trainingDays);
+			const checkInDay = (lastTrainingDay + 1) % 7;
+			debouncedSave({ training_days: trainingDays, check_in_day: checkInDay });
 		}
 	}
 
@@ -382,18 +378,6 @@
 					{name}
 				</button>
 			{/each}
-		</div>
-		<div class="check-in-row">
-			<span class="check-in-label">Check in on</span>
-			<select
-				class="check-in-select"
-				value={checkInDay}
-				onchange={(e) => setCheckInDay(parseInt(e.currentTarget.value, 10))}
-			>
-				{#each DAY_NAMES as name, i}
-					<option value={i}>{name}</option>
-				{/each}
-			</select>
 		</div>
 		<span class="sub-label">Session length</span>
 		<div class="duration-chips">
@@ -754,44 +738,6 @@
 		font-weight: var(--weight-medium);
 		color: var(--color-text-secondary);
 		margin-top: var(--space-2);
-	}
-
-	.check-in-row {
-		display: flex;
-		align-items: center;
-		gap: var(--space-3);
-		margin-top: var(--space-3);
-	}
-
-	.check-in-label {
-		font-family: var(--font-display);
-		font-size: var(--text-xs);
-		font-weight: var(--weight-medium);
-		color: var(--color-text-secondary);
-		white-space: nowrap;
-	}
-
-	.check-in-select {
-		flex: 1;
-		padding: var(--space-2) var(--space-3);
-		background: var(--color-bg);
-		border: 1.5px solid var(--color-border);
-		border-radius: var(--radius-sm);
-		color: var(--color-text);
-		font-family: var(--font-body);
-		font-size: var(--text-base);
-		outline: none;
-		transition: border-color var(--duration-normal) var(--ease-out);
-		-webkit-appearance: none;
-		appearance: none;
-		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a8a49b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-		background-repeat: no-repeat;
-		background-position: right var(--space-3) center;
-		padding-right: var(--space-8);
-	}
-
-	.check-in-select:focus {
-		border-color: var(--color-activity);
 	}
 
 	/* ═══ Field Groups ═══ */

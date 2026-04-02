@@ -119,6 +119,7 @@ export interface UserSettingsUpdate {
 	training_days?: number[];
 	session_duration_minutes?: number;
 	unit_pref?: 'lb' | 'kg';
+	check_in_day?: number;
 	updated_at?: string;
 }
 

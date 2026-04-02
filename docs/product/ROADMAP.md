@@ -30,7 +30,7 @@ These decisions reduce scope without breaking the loop:
 | Full Product | POC Simplification | Rationale |
 |---|---|---|
 | Batch API (async) + synchronous fallback | Synchronous only | Loop must feel immediate to validate. Batch is a cost optimization, not a validation requirement. |
-| Configurable check-in day | Fixed to Sunday | Simplifies week boundary logic. |
+| Auto-computed check-in day | Fixed to Sunday | Simplifies week boundary logic. Now auto-computed as day after last training day. See product-brief.md for design rationale. |
 | Progress photos in check-in | Deferred | Photos are a secondary signal. The loop's primary inputs are set logs and check-in fields. |
 | Equipment swaps mid-workout | Deferred | Differentiation feature, not part of the core loop. |
 | PWA offline logging + sync | Online only | Feedback loop doesn't depend on offline capability. |
@@ -328,7 +328,7 @@ Features drawn from design specs, research recommendations, and gaps identified 
 | Feature | POC Rationale for Deferral | MLP Relevance |
 |---|---|---|
 | PWA offline + background sync | Loop works online-only | Gym environments have poor connectivity. Critical for daily use. |
-| Configurable check-in day | Fixed Sunday simplified week boundary | Athletes train on different schedules. |
+| ~~Configurable check-in day~~ | ~~Fixed Sunday simplified week boundary~~ | ~~Replaced by auto-computed check-in day (day after last training day). Shipped. See product-brief.md for design rationale.~~ |
 | Progress photos | Secondary signal | Visual progress is a major retention driver. |
 | Dual logging (quick + granular) | Single path captures required data | Quick-complete for easy sets reduces friction. |
 | Plan review celebration UX | POC validates adaptation, not presentation | First impression of the new plan matters for retention. |
@@ -438,7 +438,7 @@ Features deferred beyond MLP. Revisit after Phase 9 based on user feedback and e
 | Feature | Notes |
 |---|---|
 | PWA offline + background sync | Requires service worker migration (`@vite-pwa/sveltekit`). Critical for gym use but significant infrastructure work. |
-| Configurable check-in day | Requires week boundary logic refactor. |
+| ~~Configurable check-in day~~ | ~~Replaced by auto-computed check-in day. Shipped.~~ |
 | Progress photos | Needs storage (Supabase Storage), upload UI, and privacy considerations. |
 | Dual logging (quick + granular) | Quick-complete for easy sets. UX design needed. |
 | Review Day experience | Streak celebration + next-week preview. Builds on Progress tab data. |

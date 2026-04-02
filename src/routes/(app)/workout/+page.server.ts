@@ -24,7 +24,7 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase,
 	// Get user's unit preference
 	const { data: settings } = await supabase
 		.from('user_settings')
-		.select('unit_pref, check_in_day')
+		.select('unit_pref, training_days')
 		.eq('user_id', user.id)
 		.single();
 
@@ -96,7 +96,10 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase,
 	}
 
 	// ── Banner logic ──
-	const checkInDay = settings?.check_in_day ?? 6;
+	// Auto-compute check-in day: day after the last training day (wraps Sun→Mon)
+	const trainingDays = settings?.training_days ?? [];
+	const lastTrainingDay = trainingDays.length > 0 ? Math.max(...trainingDays) : 5; // default Fri
+	const checkInDay = (lastTrainingDay + 1) % 7;
 	const isCheckInDay = dayIndex === checkInDay;
 
 	const planCreatedAt = new Date(fullPlan.plan.created_at);
