@@ -649,7 +649,7 @@
 	/* Mini progress bar */
 	.day-card-bottom {
 		display: flex;
-		align-items: flex-end;
+		align-items: center;
 		justify-content: space-between;
 		gap: var(--space-2);
 	}
