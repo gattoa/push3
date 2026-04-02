@@ -2,7 +2,7 @@
 	import type { FullPlan, FullPlanDay } from '$lib/types/database';
 	import SegmentedControl from '$lib/components/SegmentedControl.svelte';
 	import PlanSkeleton from '$lib/components/PlanSkeleton.svelte';
-	import { ClipboardCheck } from 'lucide-svelte';
+	import { ClipboardCheck, Pencil } from 'lucide-svelte';
 	import { page } from '$app/state';
 	import { invalidateAll } from '$app/navigation';
 	import { onDestroy } from 'svelte';
@@ -145,122 +145,59 @@
 		return { done, total };
 	}
 
-	// ── Day Drag-to-Swap State ────────────────────────────────
-	let draggedDayIndex = $state<number | null>(null);
-	let dragOverDayIndex = $state<number | null>(null);
-	let longPressTimer = $state<ReturnType<typeof setTimeout> | null>(null);
-	let isDragging = $state(false);
-	let dragStartY = $state(0);
+	// ── Edit Mode (tap-to-select, tap-to-swap) ───────────────
+	let editMode = $state(false);
+	let selectedDayId = $state<string | null>(null);
 	let swapping = $state(false);
 
-	function startDayDrag(dayIdx: number) {
-		isDragging = true;
-		draggedDayIndex = dayIdx;
-		if (navigator.vibrate) navigator.vibrate(10);
-	}
+	function handleDayTap(day: FullPlanDay) {
+		if (!editMode) return;
 
-	/** Card body: long-press to drag. Mouse uses shorter delay (150ms), touch 300ms. */
-	function handleDayPointerDown(e: PointerEvent, dayIdx: number) {
-		const tag = (e.target as HTMLElement).tagName;
-		if (tag === 'INPUT' || tag === 'BUTTON') return;
-
-		const startY = e.clientY;
-		dragStartY = startY;
-		const delay = e.pointerType === 'mouse' ? 150 : 300;
-
-		longPressTimer = setTimeout(() => {
-			startDayDrag(dayIdx);
-		}, delay);
-	}
-
-	function handleDayPointerMove(e: PointerEvent) {
-		if (longPressTimer && !isDragging) {
-			const dy = Math.abs(e.clientY - dragStartY);
-			if (dy > 8) {
-				clearTimeout(longPressTimer);
-				longPressTimer = null;
-			}
-			return;
-		}
-		if (!isDragging || draggedDayIndex === null) return;
-		e.preventDefault();
-
-		// Determine which card we're over
-		const cards = document.querySelectorAll('.day-drop-zone');
-		for (let i = 0; i < cards.length; i++) {
-			const rect = cards[i].getBoundingClientRect();
-			if (e.clientY >= rect.top && e.clientY <= rect.bottom) {
-				dragOverDayIndex = i;
-				return;
-			}
+		if (selectedDayId === null) {
+			// First tap: select this day
+			selectedDayId = day.id;
+		} else if (selectedDayId === day.id) {
+			// Tapped the same day: deselect
+			selectedDayId = null;
+		} else {
+			// Second tap on a different day: perform the swap
+			performSwap(selectedDayId, day.id);
 		}
 	}
 
-	async function handleDayPointerUp(e: PointerEvent) {
-		if (longPressTimer) {
-			clearTimeout(longPressTimer);
-			longPressTimer = null;
-		}
-		if (!isDragging || draggedDayIndex === null) {
-			isDragging = false;
-			draggedDayIndex = null;
-			dragOverDayIndex = null;
-			return;
-		}
-
-		const fromIdx = draggedDayIndex;
-		const toIdx = dragOverDayIndex;
-
-		isDragging = false;
-		draggedDayIndex = null;
-		dragOverDayIndex = null;
-
-		if (toIdx === null || toIdx === fromIdx || swapping) return;
-
-		const dayA = sortedDays[fromIdx];
-		const dayB = sortedDays[toIdx];
-		if (!dayA || !dayB) return;
-
+	async function performSwap(idA: string, idB: string) {
+		if (swapping) return;
 		swapping = true;
+		selectedDayId = null;
 
-		// Optimistic swap
-		const tempDayIndex = dayA.day_index;
-		dayA.day_index = dayB.day_index;
-		dayB.day_index = tempDayIndex;
+		const dayA = sortedDays.find((d) => d.id === idA);
+		const dayB = sortedDays.find((d) => d.id === idB);
 
 		try {
 			const res = await fetch('/api/swap-days', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ day_id_a: dayA.id, day_id_b: dayB.id })
+				body: JSON.stringify({ day_id_a: idA, day_id_b: idB })
 			});
 
 			if (res.ok) {
 				await invalidateAll();
-				addToast(`Swapped ${DAY_NAMES[dayB.day_index]} ↔ ${DAY_NAMES[dayA.day_index]}`, 'success');
+				if (dayA && dayB) {
+					addToast(`Swapped ${DAY_NAMES[dayA.day_index]} ↔ ${DAY_NAMES[dayB.day_index]}`, 'success');
+				}
 			} else {
-				// Revert
-				dayB.day_index = dayA.day_index;
-				dayA.day_index = tempDayIndex;
 				addToast('Swap failed — try again', 'error');
 			}
 		} catch {
-			dayB.day_index = dayA.day_index;
-			dayA.day_index = tempDayIndex;
 			addToast('Network error — check your connection', 'error');
 		} finally {
 			swapping = false;
 		}
 	}
 
-	function handleDayPointerCancel() {
-		if (longPressTimer) {
-			clearTimeout(longPressTimer);
-			longPressTimer = null;
-		}
-		isDragging = false;
-		draggedDayIndex = null;
-		dragOverDayIndex = null;
+	function exitEditMode() {
+		editMode = false;
+		selectedDayId = null;
 	}
 </script>
 
@@ -271,46 +208,96 @@
 <div class="agenda-page">
 	<header class="agenda-header">
 		<div class="header-bar">
-			<div class="header-slot"></div>
-			<SegmentedControl active="week" />
-			<AvatarMenu />
+			{#if editMode}
+				<button class="edit-btn active" onclick={exitEditMode}>Done</button>
+			{:else if plan && plan.days.length > 1}
+				<button class="edit-btn" onclick={() => editMode = true} title="Edit schedule">
+					<Pencil size={16} strokeWidth={2} />
+				</button>
+			{:else}
+				<div class="header-slot"></div>
+			{/if}
+			{#if editMode}
+				<span class="edit-mode-title">Edit Schedule</span>
+			{:else}
+				<SegmentedControl active="week" />
+			{/if}
+			{#if editMode}
+				<div class="header-slot"></div>
+			{:else}
+				<AvatarMenu />
+			{/if}
 		</div>
-		<h1 class="header-title">This Week</h1>
+		{#if editMode}
+			<p class="edit-hint">Tap a day, then tap another to swap</p>
+		{:else}
+			<h1 class="header-title">This Week</h1>
+		{/if}
 	</header>
 
 	{#if plan}
 		<!-- ═══ Active plan ═══ -->
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div
-			class="day-list"
-			onpointermove={isDragging ? handleDayPointerMove : undefined}
-			onpointerup={isDragging ? handleDayPointerUp : undefined}
-			onpointercancel={isDragging ? handleDayPointerCancel : undefined}
-		>
-			{#each sortedDays as day, i}
+		<div class="day-list">
+			{#each sortedDays as day}
 				{@const progress = getDayProgress(day)}
 				{@const isToday = day.day_index === todayIndex}
 				{@const isRest = day.exercises.length === 0}
 				{@const isComplete = progress.total > 0 && progress.done === progress.total}
-				{@const isBeingDragged = isDragging && draggedDayIndex === i}
-				{@const isDragTarget = isDragging && dragOverDayIndex === i && draggedDayIndex !== i}
-				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<div
-					class="day-card-wrap day-drop-zone"
-					class:dragging={isBeingDragged}
-					class:drag-target={isDragTarget}
-					onpointerdown={(e) => handleDayPointerDown(e, i)}
-					onpointermove={handleDayPointerMove}
-					onpointerup={handleDayPointerUp}
-					onpointercancel={handleDayPointerCancel}
-				>
-					<a
-						href={isDragging ? undefined : `/workout/${day.day_index}`}
+				{@const isSelected = editMode && selectedDayId === day.id}
+
+				{#if editMode}
+					<button
 						class="day-card"
 						class:today={isToday}
 						class:rest={isRest}
 						class:complete={isComplete}
-						onclick={(e) => { if (isDragging) e.preventDefault(); }}
+						class:selected={isSelected}
+						class:swapping
+						onclick={() => handleDayTap(day)}
+						disabled={swapping}
+					>
+						<div class="day-card-top">
+							<span class="day-name">{DAY_NAMES[day.day_index]}</span>
+							{#if isToday}
+								<span class="today-badge">Today</span>
+							{/if}
+						</div>
+
+						{#if isRest}
+							<span class="rest-label">Rest Day</span>
+						{:else}
+							<span class="split-label">{day.split_label}</span>
+							<div class="day-card-stats">
+								<span>{day.exercises.length} exercises</span>
+								<span class="dot-sep">&middot;</span>
+								<span>{progress.total} sets</span>
+							</div>
+							{#if progress.total > 0}
+								<div class="mini-progress">
+									<div class="mini-progress-bar">
+										<div
+											class="mini-progress-fill"
+											style="width: {(progress.done / progress.total) * 100}%"
+										></div>
+									</div>
+									<span class="mini-progress-text">
+										{#if isComplete}
+											&#10003;
+										{:else}
+											{progress.done}/{progress.total}
+										{/if}
+									</span>
+								</div>
+							{/if}
+						{/if}
+					</button>
+				{:else}
+					<a
+						href="/workout/{day.day_index}"
+						class="day-card"
+						class:today={isToday}
+						class:rest={isRest}
+						class:complete={isComplete}
 					>
 						<div class="day-card-top">
 							<span class="day-name">{DAY_NAMES[day.day_index]}</span>
@@ -347,7 +334,7 @@
 							{/if}
 						{/if}
 					</a>
-				</div>
+				{/if}
 			{/each}
 		</div>
 
@@ -505,36 +492,60 @@
 		background: var(--color-surface-active);
 	}
 
+	/* ── Edit mode ── */
+	.edit-btn {
+		width: 40px;
+		height: 40px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: transparent;
+		border: none;
+		color: var(--color-text-secondary);
+		cursor: pointer;
+		border-radius: var(--radius);
+		flex-shrink: 0;
+		font-family: var(--font-display);
+		font-size: var(--text-xs);
+		font-weight: var(--weight-semibold);
+		transition: color var(--duration-fast);
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	.edit-btn:hover {
+		color: var(--color-text);
+	}
+
+	.edit-btn.active {
+		color: var(--color-activity);
+	}
+
+	.edit-mode-title {
+		font-family: var(--font-display);
+		font-size: var(--text-sm);
+		font-weight: var(--weight-semibold);
+		color: var(--color-text);
+	}
+
+	.edit-hint {
+		font-size: var(--text-xs);
+		color: var(--color-text-secondary);
+		text-align: center;
+	}
+
 	/* ── Day cards ── */
 	.day-list {
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
-		touch-action: pan-y;
-	}
-
-	.day-card-wrap {
-		position: relative;
-		transition: transform var(--duration-normal) var(--ease-out),
-			opacity var(--duration-normal) var(--ease-out);
-	}
-
-	.day-card-wrap.dragging {
-		opacity: 0.4;
-		transform: scale(0.97);
-	}
-
-	.day-card-wrap.drag-target {
-		transform: scale(1.02);
-	}
-
-	.day-card-wrap.drag-target .day-card {
-		border-color: var(--color-activity);
-		box-shadow: 0 0 0 1px var(--color-activity), var(--shadow-md);
 	}
 
 	.day-card {
 		display: block;
+		width: 100%;
+		text-align: left;
+		font: inherit;
+		cursor: pointer;
 		background: var(--color-surface);
 		border: 1.5px solid var(--color-border);
 		border-radius: var(--radius);
@@ -558,6 +569,16 @@
 
 	.day-card.rest:hover {
 		opacity: 0.8;
+	}
+
+	.day-card.selected {
+		border-color: var(--color-activity);
+		box-shadow: var(--shadow-glow);
+	}
+
+	.day-card.swapping {
+		opacity: 0.5;
+		pointer-events: none;
 	}
 
 	.day-card-top {

@@ -3,8 +3,8 @@ import type { RequestHandler } from './$types';
 
 /**
  * POST /api/swap-days
- * Swap two planned_days' day_index values within the same weekly plan.
- * Used by drag-to-swap on the weekly plan page.
+ * Swap the content (split_label + exercises) between two planned_days.
+ * The day_index values stay fixed — only the content moves.
  */
 export const POST: RequestHandler = async ({ request, locals: { safeGetSession, supabase } }) => {
 	const { user } = await safeGetSession();
@@ -27,13 +27,13 @@ export const POST: RequestHandler = async ({ request, locals: { safeGetSession, 
 	// Fetch both days and verify they belong to the same plan
 	const { data: dayA, error: errA } = await supabase
 		.from('planned_days')
-		.select('id, plan_id, day_index')
+		.select('id, plan_id, day_index, split_label')
 		.eq('id', day_id_a)
 		.single();
 
 	const { data: dayB, error: errB } = await supabase
 		.from('planned_days')
-		.select('id, plan_id, day_index')
+		.select('id, plan_id, day_index, split_label')
 		.eq('id', day_id_b)
 		.single();
 
@@ -56,43 +56,76 @@ export const POST: RequestHandler = async ({ request, locals: { safeGetSession, 
 		return json({ error: 'Forbidden' }, { status: 403 });
 	}
 
-	// Swap day_index values using a temporary value to avoid unique constraint violation
-	// planned_days has unique(plan_id, day_index), so we use a 3-step swap via temp index
-	const tempIndex = 99;
-
-	// Step 1: Move A to temp
-	const { error: e1 } = await supabase
+	// 1. Swap split_label values
+	const { error: labelErrA } = await supabase
 		.from('planned_days')
-		.update({ day_index: tempIndex })
+		.update({ split_label: dayB.split_label })
 		.eq('id', dayA.id);
 
-	if (e1) {
-		return json({ error: e1.message }, { status: 500 });
+	if (labelErrA) {
+		return json({ error: labelErrA.message }, { status: 500 });
 	}
 
-	// Step 2: Move B to A's old index
-	const { error: e2 } = await supabase
+	const { error: labelErrB } = await supabase
 		.from('planned_days')
-		.update({ day_index: dayA.day_index })
+		.update({ split_label: dayA.split_label })
 		.eq('id', dayB.id);
 
-	if (e2) {
-		// Rollback step 1
-		await supabase.from('planned_days').update({ day_index: dayA.day_index }).eq('id', dayA.id);
-		return json({ error: e2.message }, { status: 500 });
+	if (labelErrB) {
+		// Rollback A's label
+		await supabase.from('planned_days').update({ split_label: dayA.split_label }).eq('id', dayA.id);
+		return json({ error: labelErrB.message }, { status: 500 });
 	}
 
-	// Step 3: Move A (at temp) to B's old index
-	const { error: e3 } = await supabase
-		.from('planned_days')
-		.update({ day_index: dayB.day_index })
-		.eq('id', dayA.id);
+	// 2. Reassign exercises: move A's exercises to B, and B's exercises to A.
+	//    Use a temp day_id to avoid any potential issues — but planned_exercises
+	//    has no unique constraint on day_id, so we can do direct reassignment.
+	//    We batch by fetching IDs first, then updating.
 
-	if (e3) {
-		// Rollback — best effort
-		await supabase.from('planned_days').update({ day_index: dayB.day_index }).eq('id', dayB.id);
-		await supabase.from('planned_days').update({ day_index: dayA.day_index }).eq('id', dayA.id);
-		return json({ error: e3.message }, { status: 500 });
+	const { data: exA } = await supabase
+		.from('planned_exercises')
+		.select('id')
+		.eq('day_id', dayA.id);
+
+	const { data: exB } = await supabase
+		.from('planned_exercises')
+		.select('id')
+		.eq('day_id', dayB.id);
+
+	const idsA = (exA ?? []).map((e) => e.id);
+	const idsB = (exB ?? []).map((e) => e.id);
+
+	// Move A's exercises to B
+	if (idsA.length > 0) {
+		const { error } = await supabase
+			.from('planned_exercises')
+			.update({ day_id: dayB.id })
+			.in('id', idsA);
+
+		if (error) {
+			// Best-effort rollback labels
+			await supabase.from('planned_days').update({ split_label: dayA.split_label }).eq('id', dayA.id);
+			await supabase.from('planned_days').update({ split_label: dayB.split_label }).eq('id', dayB.id);
+			return json({ error: error.message }, { status: 500 });
+		}
+	}
+
+	// Move B's exercises to A
+	if (idsB.length > 0) {
+		const { error } = await supabase
+			.from('planned_exercises')
+			.update({ day_id: dayA.id })
+			.in('id', idsB);
+
+		if (error) {
+			// Best-effort rollback: move A's exercises back
+			if (idsA.length > 0) {
+				await supabase.from('planned_exercises').update({ day_id: dayA.id }).in('id', idsA);
+			}
+			await supabase.from('planned_days').update({ split_label: dayA.split_label }).eq('id', dayA.id);
+			await supabase.from('planned_days').update({ split_label: dayB.split_label }).eq('id', dayB.id);
+			return json({ error: error.message }, { status: 500 });
+		}
 	}
 
 	return json({ success: true });

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ArrowLeft } from 'lucide-svelte';
+	import { ArrowLeft, Pencil } from 'lucide-svelte';
 	import SegmentedControl from '$lib/components/SegmentedControl.svelte';
 	import WorkoutSession from '$lib/components/WorkoutSession.svelte';
 	import { navigating } from '$app/stores';
@@ -12,6 +12,8 @@
 	const exerciseHistory = $derived(data.exerciseHistory as Record<string, { lastWeight: number; lastReps: number; bestE1RM: number }>);
 
 	const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+	let editMode = $state(false);
 
 	// Skip pushUp animation on client-side navigation
 	let isClientNav = $state(false);
@@ -27,19 +29,39 @@
 <div class="page">
 	<header class="header" class:push-up={!isClientNav} style="--d:0">
 		<div class="header-bar">
-			<a href="/plan" class="back-btn" title="Back to week">
-				<ArrowLeft size={18} strokeWidth={2} />
-			</a>
-			<SegmentedControl active="week" />
-			<div class="header-slot"></div>
+			{#if editMode}
+				<div class="header-slot"></div>
+			{:else}
+				<a href="/plan" class="back-btn" title="Back to week">
+					<ArrowLeft size={18} strokeWidth={2} />
+				</a>
+			{/if}
+			{#if editMode}
+				<span class="edit-mode-title">Reorder Exercises</span>
+			{:else}
+				<SegmentedControl active="week" />
+			{/if}
+			{#if editMode}
+				<button class="edit-btn active" onclick={() => editMode = false}>Done</button>
+			{:else if day.exercises.length > 1}
+				<button class="edit-btn" onclick={() => editMode = true} title="Reorder exercises">
+					<Pencil size={16} strokeWidth={2} />
+				</button>
+			{:else}
+				<div class="header-slot"></div>
+			{/if}
 		</div>
 		<div class="header-context">
 			<h1 class="header-day">{DAY_NAMES[day.day_index]}</h1>
-			<span class="header-split">{day.split_label}</span>
+			{#if editMode}
+				<p class="edit-hint">Tap an exercise, then tap another to swap</p>
+			{:else}
+				<span class="header-split">{day.split_label}</span>
+			{/if}
 		</div>
 	</header>
 
-	<WorkoutSession {day} {unitPref} {exerciseHistory} enableReorder={day.exercises.length > 1} />
+	<WorkoutSession {day} {unitPref} {exerciseHistory} {editMode} />
 </div>
 
 <style>
@@ -116,5 +138,45 @@
 		font-size: var(--text-sm);
 		color: var(--color-text-secondary);
 		text-transform: capitalize;
+	}
+
+	.edit-btn {
+		width: 40px;
+		height: 40px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: transparent;
+		border: none;
+		color: var(--color-text-secondary);
+		cursor: pointer;
+		border-radius: var(--radius);
+		flex-shrink: 0;
+		font-family: var(--font-display);
+		font-size: var(--text-xs);
+		font-weight: var(--weight-semibold);
+		transition: color var(--duration-fast);
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	.edit-btn:hover {
+		color: var(--color-text);
+	}
+
+	.edit-btn.active {
+		color: var(--color-activity);
+	}
+
+	.edit-mode-title {
+		font-family: var(--font-display);
+		font-size: var(--text-sm);
+		font-weight: var(--weight-semibold);
+		color: var(--color-text);
+	}
+
+	.edit-hint {
+		font-size: var(--text-xs);
+		color: var(--color-text-secondary);
+		text-align: center;
 	}
 </style>

@@ -13,134 +13,77 @@
 		day,
 		unitPref,
 		exerciseHistory,
-		enableReorder = false,
+		editMode = false,
 	}: {
 		day: FullPlanDay;
 		unitPref: string;
 		exerciseHistory: Record<string, { lastWeight: number; lastReps: number; bestE1RM: number }>;
-		enableReorder?: boolean;
+		editMode?: boolean;
 	} = $props();
 
-	// ── Drag Reorder State ────────────────────────────────────
-	let draggedIndex = $state<number | null>(null);
-	let dragOverIndex = $state<number | null>(null);
-	let longPressTimer = $state<ReturnType<typeof setTimeout> | null>(null);
-	let isDragging = $state(false);
-	let dragStartY = $state(0);
-	let dragCurrentY = $state(0);
-	let dragPointerId = $state<number | null>(null);
+	// ── Edit Mode (tap-to-select, tap-to-swap) ───────────────
+	let selectedExerciseId = $state<string | null>(null);
+	let reordering = $state(false);
 
-	function startDrag(index: number, y: number, el: HTMLElement | null, pointerId: number) {
-		isDragging = true;
-		draggedIndex = index;
-		dragStartY = y;
-		dragCurrentY = y;
-		dragPointerId = pointerId;
-		el?.setPointerCapture(pointerId);
-		if (navigator.vibrate) navigator.vibrate(10);
+	// Reset selection when edit mode is toggled off
+	$effect(() => {
+		if (!editMode) selectedExerciseId = null;
+	});
+
+	function handleExerciseTap(exercise: FullPlanExercise) {
+		if (!editMode) return;
+
+		if (selectedExerciseId === null) {
+			selectedExerciseId = exercise.id;
+		} else if (selectedExerciseId === exercise.id) {
+			selectedExerciseId = null;
+		} else {
+			performReorder(selectedExerciseId, exercise.id);
+		}
 	}
 
-	/** Card body: long-press to drag. Mouse uses shorter delay (150ms), touch 300ms. */
-	function handleDragPointerDown(e: PointerEvent, index: number) {
-		if (!enableReorder) return;
-		const tag = (e.target as HTMLElement).tagName;
-		if (tag === 'INPUT' || tag === 'BUTTON') return;
-
-		const startY = e.clientY;
-		dragStartY = startY;
-		const delay = e.pointerType === 'mouse' ? 150 : 300;
-		const el = e.currentTarget as HTMLElement;
-		const pointerId = e.pointerId;
-		longPressTimer = setTimeout(() => {
-			startDrag(index, startY, el, pointerId);
-		}, delay);
-	}
-
-	function handleDragPointerMove(e: PointerEvent) {
-		if (longPressTimer && !isDragging) {
-			const dy = Math.abs(e.clientY - dragStartY);
-			if (dy > 8) {
-				clearTimeout(longPressTimer);
-				longPressTimer = null;
-			}
-			return;
-		}
-		if (!isDragging || draggedIndex === null) return;
-		dragCurrentY = e.clientY;
-
-		// Determine which card we're over
-		const cards = document.querySelectorAll('.exercise-drop-zone');
-		for (let i = 0; i < cards.length; i++) {
-			const rect = cards[i].getBoundingClientRect();
-			const midY = rect.top + rect.height / 2;
-			if (e.clientY < midY) {
-				dragOverIndex = i;
-				return;
-			}
-		}
-		dragOverIndex = cards.length;
-	}
-
-	function handleDragPointerUp(e: PointerEvent) {
-		if (longPressTimer) {
-			clearTimeout(longPressTimer);
-			longPressTimer = null;
-		}
-		if (!isDragging || draggedIndex === null) {
-			isDragging = false;
-			draggedIndex = null;
-			dragOverIndex = null;
-			return;
-		}
+	async function performReorder(idA: string, idB: string) {
+		if (reordering) return;
+		reordering = true;
+		selectedExerciseId = null;
 
 		const sorted = [...day.exercises].sort((a, b) => a.order_index - b.order_index);
-		let targetIndex = dragOverIndex ?? draggedIndex;
-		if (targetIndex > draggedIndex) targetIndex--;
-		if (targetIndex < 0) targetIndex = 0;
-		if (targetIndex >= sorted.length) targetIndex = sorted.length - 1;
+		const indexA = sorted.findIndex((e) => e.id === idA);
+		const indexB = sorted.findIndex((e) => e.id === idB);
 
-		if (targetIndex !== draggedIndex) {
-			// Rearrange
-			const item = sorted.splice(draggedIndex, 1)[0];
-			sorted.splice(targetIndex, 0, item);
+		if (indexA === -1 || indexB === -1) {
+			reordering = false;
+			return;
+		}
 
-			// Reassign order_index
-			sorted.forEach((ex, i) => { ex.order_index = i; });
+		// Swap positions
+		const tempOrder = sorted[indexA].order_index;
+		sorted[indexA].order_index = sorted[indexB].order_index;
+		sorted[indexB].order_index = tempOrder;
 
-			// Optimistic update
-			day = { ...day, exercises: [...sorted] };
+		// Optimistic update
+		day = { ...day, exercises: [...sorted] };
 
-			// Single API call with final order
-			fetch('/api/reorder-exercises', {
+		try {
+			const res = await fetch('/api/reorder-exercises', {
 				method: 'PATCH',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					day_id: day.id,
 					exercise_order: sorted.map((e) => ({ id: e.id, order_index: e.order_index }))
 				})
-			}).then(res => {
-				if (!res.ok) {
-					addToast('Failed to reorder', 'error');
-					invalidateAll();
-				}
 			});
-		}
 
-		isDragging = false;
-		draggedIndex = null;
-		dragOverIndex = null;
-		dragPointerId = null;
-	}
-
-	function handleDragPointerCancel() {
-		if (longPressTimer) {
-			clearTimeout(longPressTimer);
-			longPressTimer = null;
+			if (!res.ok) {
+				addToast('Failed to reorder', 'error');
+				await invalidateAll();
+			}
+		} catch {
+			addToast('Network error — check your connection', 'error');
+			await invalidateAll();
+		} finally {
+			reordering = false;
 		}
-		isDragging = false;
-		draggedIndex = null;
-		dragOverIndex = null;
-		dragPointerId = null;
 	}
 
 	// ── Set State ──────────────────────────────────────────────
@@ -294,7 +237,7 @@
 	const SWIPE_THRESHOLD = 60;
 
 	function handlePointerDown(e: PointerEvent, exerciseId: string) {
-		if (isDragging) return;
+		if (editMode) return;
 		if (flippedId && flippedId !== exerciseId) return;
 		const tag = (e.target as HTMLElement).tagName;
 		if (tag === 'INPUT' || tag === 'BUTTON') return;
@@ -308,7 +251,7 @@
 	}
 
 	function handlePointerMove(e: PointerEvent) {
-		if (!swipingId || isDragging) return;
+		if (!swipingId || editMode) return;
 		const dx = e.clientX - swipeStartX;
 		const dy = e.clientY - swipeStartY;
 		if (!swipeLocked && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
@@ -321,7 +264,7 @@
 	}
 
 	function handlePointerUp(e: PointerEvent) {
-		if (!swipingId || isDragging) return;
+		if (!swipingId || editMode) return;
 		const dx = e.clientX - swipeStartX;
 		if (swipeLocked === 'horizontal') {
 			if (dx < -SWIPE_THRESHOLD && !flippedId) {
@@ -342,7 +285,7 @@
 
 	function handleCardClick(exerciseId: string, isExpanded: boolean) {
 		if (didSwipe) { didSwipe = false; return; }
-		if (isDragging) return;
+		if (editMode) return; // In edit mode, card taps are handled by handleExerciseTap
 		expandedExercise = isExpanded ? null : exerciseId;
 	}
 
@@ -484,45 +427,30 @@
 	{/if}
 
 	<!-- ═══ Exercise Cards ═══ -->
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div
-		class="exercises"
-		onpointermove={isDragging ? handleDragPointerMove : undefined}
-		onpointerup={isDragging ? handleDragPointerUp : undefined}
-		onpointercancel={isDragging ? handleDragPointerCancel : undefined}
-	>
+	<div class="exercises">
 		{#each day.exercises.slice().sort((a, b) => a.order_index - b.order_index) as exercise, i (exercise.exercise_id)}
 			{@const prog = exerciseProgress(exercise)}
 			{@const exState = getExerciseState(exercise)}
-			{@const isExpanded = expandedExercise === exercise.id && !isDragging}
+			{@const isExpanded = expandedExercise === exercise.id && !editMode}
 			{@const hasPR = exercise.sets.some((s) => isPR(exercise.exercise_id, s.id))}
 			{@const hist = exerciseHistory[exercise.exercise_id]}
-			{@const isBeingDragged = isDragging && draggedIndex === i}
-			{@const showDropBefore = isDragging && dragOverIndex === i && draggedIndex !== i && draggedIndex !== i - 1}
+			{@const isSelected = editMode && selectedExerciseId === exercise.id}
 
-			{#if showDropBefore}
-				<div class="drop-indicator"></div>
-			{/if}
-
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
-				class="flip-container exercise-drop-zone"
+				class="flip-container"
 				class:flipped={flippedId === exercise.id}
-				class:dragging={isBeingDragged}
+				class:selected={isSelected}
+				class:reordering
+				role={editMode ? 'button' : undefined}
+				tabindex={editMode ? 0 : undefined}
+				onclick={editMode ? () => handleExerciseTap(exercise) : undefined}
+				onkeydown={editMode ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleExerciseTap(exercise); } } : undefined}
 				onpointerdown={(e) => {
-					if (enableReorder && !flippedId) handleDragPointerDown(e, i);
-					if (flippedId === exercise.id || (isExpanded && hasPendingSets(exercise))) handlePointerDown(e, exercise.id);
+					if (!editMode && (flippedId === exercise.id || (isExpanded && hasPendingSets(exercise)))) handlePointerDown(e, exercise.id);
 				}}
-				onpointermove={(e) => {
-					if (isDragging) handleDragPointerMove(e);
-					else handlePointerMove(e);
-				}}
-				onpointerup={(e) => {
-					if (isDragging) handleDragPointerUp(e);
-					else handlePointerUp(e);
-				}}
+				onpointermove={handlePointerMove}
+				onpointerup={handlePointerUp}
 				onpointercancel={() => {
-					handleDragPointerCancel();
 					swipingId = null;
 					swipeLocked = null;
 				}}
@@ -712,9 +640,7 @@
 				</div>
 			</div>
 
-			{#if isDragging && dragOverIndex === day.exercises.length && i === day.exercises.length - 1}
-				<div class="drop-indicator"></div>
-			{/if}
+
 		{/each}
 	</div>
 
@@ -892,24 +818,15 @@
 		background: var(--color-surface-hover);
 	}
 
-	/* ═══ Drag State ═══ */
-	.flip-container.dragging {
-		opacity: 0.4;
-		transform: scale(0.97);
-		transition: opacity var(--duration-fast), transform var(--duration-fast);
+	/* ═══ Edit Mode (tap-to-select) ═══ */
+	.flip-container.selected > .flip-front {
+		border-color: var(--color-activity);
+		box-shadow: var(--shadow-glow);
 	}
 
-	.drop-indicator {
-		height: 3px;
-		background: var(--color-activity);
-		border-radius: var(--radius-full);
-		margin: calc(-1 * var(--space-1-5)) 0;
-		animation: dropPulse 1s ease-in-out infinite;
-	}
-
-	@keyframes dropPulse {
-		0%, 100% { opacity: 1; }
-		50% { opacity: 0.5; }
+	.flip-container.reordering {
+		opacity: 0.5;
+		pointer-events: none;
 	}
 
 	.card-num {
