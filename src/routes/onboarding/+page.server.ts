@@ -58,6 +58,10 @@ export const actions: Actions = {
 			return fail(400, { message: 'Invalid gender value.' });
 		}
 
+		// Auto-compute check-in day: day after the last training day
+		const lastTrainingDay = Math.max(...training_days);
+		const check_in_day = (lastTrainingDay + 1) % 7;
+
 		const settingsPayload: UserSettingsUpdate = {
 			date_of_birth,
 			gender: gender as 'male' | 'female' | 'prefer_not_to_say',
@@ -67,7 +71,8 @@ export const actions: Actions = {
 			injuries,
 			training_days,
 			session_duration_minutes,
-			unit_pref
+			unit_pref,
+			check_in_day
 		};
 
 		console.log('[onboarding] Saving settings for user:', user.id, JSON.stringify(settingsPayload));

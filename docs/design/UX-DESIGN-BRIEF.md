@@ -77,7 +77,7 @@ Rationale: Persistent bottom nav provides constant orientation, solves rest day 
 The Workout tab surfaces two contextual banners. At most one banner at a time — they are sequential in the weekly cycle, never simultaneous.
 
 1. **Plan review banner** — Appears after new plan generation. Shows a compact week overview (training days, splits, exercise counts). Tapping navigates to the weekly agenda (`/plan`) where the full plan review and editing lives. The banner is the trigger; the agenda is the experience.
-2. **Check-in banner** — Appears when the check-in day arrives (fixed to Sunday for POC; configurable post-POC), regardless of whether all training days are complete. Tapping navigates to `/check-in`.
+2. **Check-in banner** — Appears when the check-in day arrives (auto-computed as the day after the user's last training day), regardless of whether all training days are complete. Tapping navigates to `/check-in`.
 
 **Persistence rule:** Both banners persist for 48 hours or until dismissed, whichever comes first.
 
@@ -194,7 +194,7 @@ Decisions 1–4 were resolved together because they are interdependent: navigati
 
 **Decision 1: Navigation — Persistent two-tab bottom nav**
 
-Two tabs: Workout (daily-first) and Progress (history, stats, PRs, settings). Progress replaces the product brief's "Profile" concept — same content, renamed. Weekly agenda accessed via header icon on the Workout tab. Check-in is contextual: a single entry point via a prompt banner on the Workout tab when the check-in day arrives (fixed to Sunday for POC, configurable post-POC). Plan review is also a banner — appears after generation, tapping navigates to the agenda for full review and editing. Both banners persist 48 hours or until dismissed. At most one banner at a time.
+Two tabs: Workout (daily-first) and Progress (history, stats, PRs, settings). Progress replaces the product brief's "Profile" concept — same content, renamed. Weekly agenda accessed via header icon on the Workout tab. Check-in is contextual: a single entry point via a prompt banner on the Workout tab when the check-in day arrives (auto-computed as the day after the user's last training day). Plan review is also a banner — appears after generation, tapping navigates to the agenda for full review and editing. Both banners persist 48 hours or until dismissed. At most one banner at a time.
 
 Evidence: [[R014](../research/Research-Findings-Report.md)] bottom-screen navigation recommended for gym accessibility. [[F004](../research/Research-Findings-Report.md)] Strong/Hevy use bottom-tab as primary nav. [[F011](../research/Research-Findings-Report.md)] No popular workout app is a PWA — persistent nav helps bridge the native-app perception gap. [[I007](../research/Research-Findings-Report.md)] PWA viable but must feel native.
 

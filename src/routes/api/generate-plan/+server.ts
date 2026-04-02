@@ -34,7 +34,7 @@ export const GET: RequestHandler = async ({ locals: { safeGetSession, supabase, 
 // POST — Generate a new plan
 // ============================================================================
 
-export const POST: RequestHandler = async ({ locals: { safeGetSession, supabase } }) => {
+export const POST: RequestHandler = async ({ locals: { safeGetSession, supabase, timezone } }) => {
 	const { user } = await safeGetSession();
 	if (!user) {
 		return json({ error: 'Not authenticated' }, { status: 401 });
@@ -61,7 +61,7 @@ export const POST: RequestHandler = async ({ locals: { safeGetSession, supabase 
 	}
 
 	try {
-		const result = await generatePlan(supabase, user.id);
+		const result = await generatePlan(supabase, user.id, timezone);
 
 		if ('error' in result) {
 			// If a plan already exists, return its status so the client can poll

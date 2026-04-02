@@ -2,7 +2,7 @@
 	import type { FullPlan, FullPlanDay } from '$lib/types/database';
 	import SegmentedControl from '$lib/components/SegmentedControl.svelte';
 	import PlanSkeleton from '$lib/components/PlanSkeleton.svelte';
-	import { ClipboardCheck } from 'lucide-svelte';
+	import { ClipboardCheck, Check } from 'lucide-svelte';
 	import { page } from '$app/state';
 	import { invalidateAll } from '$app/navigation';
 	import { onDestroy } from 'svelte';
@@ -131,18 +131,28 @@
 		plan ? [...plan.days].sort((a, b) => a.day_index - b.day_index) : []
 	);
 
-	function getDayProgress(day: FullPlanDay): { done: number; total: number } {
+	// Arc constants (matches exercise arc proportions)
+	const ARC_R = 22;
+	const ARC_C = Math.PI * ARC_R;
+
+	function getDayProgress(day: FullPlanDay): { done: number; total: number; hasPR: boolean } {
 		let total = 0;
 		let done = 0;
+		let hasPR = false;
 		for (const ex of day.exercises) {
 			for (const set of ex.sets) {
 				total++;
 				if (set.log && (set.log.status === 'completed' || set.log.status === 'skipped')) {
 					done++;
 				}
+				// Check for PR: completed set with actual values exceeding target
+				if (set.log && set.log.status === 'completed' && set.log.actual_weight && set.log.actual_reps) {
+					if (set.target_weight && set.log.actual_weight > set.target_weight) hasPR = true;
+					if (set.target_reps && set.log.actual_reps > set.target_reps) hasPR = true;
+				}
 			}
 		}
-		return { done, total };
+		return { done, total, hasPR };
 	}
 
 	// ── Edit Mode (tap-to-select, tap-to-swap) ───────────────
@@ -260,39 +270,40 @@
 						onclick={() => handleDayTap(day)}
 						disabled={swapping}
 					>
-						<div class="day-card-top">
-							<span class="day-name">{DAY_NAMES[day.day_index]}</span>
-							{#if isToday}
-								<span class="today-badge">Today</span>
-							{/if}
-						</div>
-
-						{#if isRest}
-							<span class="rest-label">Rest Day</span>
-						{:else}
-							<span class="split-label">{day.split_label}</span>
-							<div class="day-card-stats">
-								<span>{day.exercises.length} exercises</span>
-								<span class="dot-sep">&middot;</span>
-								<span>{progress.total} sets</span>
+						<div class="day-card-content">
+							<div class="day-card-top">
+								<span class="day-name">{DAY_NAMES[day.day_index]}</span>
+								{#if isToday}
+									<span class="today-badge">Today</span>
+								{/if}
 							</div>
-							{#if progress.total > 0}
-								<div class="mini-progress">
-									<div class="mini-progress-bar">
-										<div
-											class="mini-progress-fill"
-											style="width: {(progress.done / progress.total) * 100}%"
-										></div>
-									</div>
-									<span class="mini-progress-text">
-										{#if isComplete}
-											&#10003;
-										{:else}
-											{progress.done}/{progress.total}
-										{/if}
-									</span>
+
+							{#if isRest}
+								<span class="rest-label">Rest Day</span>
+							{:else}
+								<span class="split-label">{day.split_label}</span>
+								<div class="day-card-stats">
+									<span>{day.exercises.length} exercises</span>
+									<span class="dot-sep">&middot;</span>
+									<span>{progress.total} sets</span>
 								</div>
 							{/if}
+						</div>
+						{#if !isRest && progress.done > 0}
+							<div class="day-arc-wrap">
+								<svg class="day-arc" viewBox="0 0 52 32" fill="none">
+									<path d="M 4 28 A {ARC_R} {ARC_R} 0 0 1 48 28" stroke="var(--color-border)" stroke-width="3" stroke-linecap="round" fill="none" />
+									<path d="M 4 28 A {ARC_R} {ARC_R} 0 0 1 48 28" stroke={isComplete ? 'var(--color-celebrate)' : 'var(--color-activity)'} stroke-width="3" stroke-linecap="round" fill="none" stroke-dasharray={ARC_C} stroke-dashoffset={ARC_C * (1 - progress.done / progress.total)} class="arc-fill" />
+								</svg>
+								{#if isComplete}
+									<span class="day-arc-icon">
+										<Check size={14} strokeWidth={3} />
+									</span>
+								{/if}
+								<span class="day-arc-label" class:complete={isComplete}>
+									{#if isComplete}Done{:else}{progress.done}/{progress.total}{/if}
+								</span>
+							</div>
 						{/if}
 					</button>
 				{:else}
@@ -303,39 +314,40 @@
 						class:rest={isRest}
 						class:complete={isComplete}
 					>
-						<div class="day-card-top">
-							<span class="day-name">{DAY_NAMES[day.day_index]}</span>
-							{#if isToday}
-								<span class="today-badge">Today</span>
-							{/if}
-						</div>
-
-						{#if isRest}
-							<span class="rest-label">Rest Day</span>
-						{:else}
-							<span class="split-label">{day.split_label}</span>
-							<div class="day-card-stats">
-								<span>{day.exercises.length} exercises</span>
-								<span class="dot-sep">&middot;</span>
-								<span>{progress.total} sets</span>
+						<div class="day-card-content">
+							<div class="day-card-top">
+								<span class="day-name">{DAY_NAMES[day.day_index]}</span>
+								{#if isToday}
+									<span class="today-badge">Today</span>
+								{/if}
 							</div>
-							{#if progress.total > 0}
-								<div class="mini-progress">
-									<div class="mini-progress-bar">
-										<div
-											class="mini-progress-fill"
-											style="width: {(progress.done / progress.total) * 100}%"
-										></div>
-									</div>
-									<span class="mini-progress-text">
-										{#if isComplete}
-											&#10003;
-										{:else}
-											{progress.done}/{progress.total}
-										{/if}
-									</span>
+
+							{#if isRest}
+								<span class="rest-label">Rest Day</span>
+							{:else}
+								<span class="split-label">{day.split_label}</span>
+								<div class="day-card-stats">
+									<span>{day.exercises.length} exercises</span>
+									<span class="dot-sep">&middot;</span>
+									<span>{progress.total} sets</span>
 								</div>
 							{/if}
+						</div>
+						{#if !isRest && progress.done > 0}
+							<div class="day-arc-wrap">
+								<svg class="day-arc" viewBox="0 0 52 32" fill="none">
+									<path d="M 4 28 A {ARC_R} {ARC_R} 0 0 1 48 28" stroke="var(--color-border)" stroke-width="3" stroke-linecap="round" fill="none" />
+									<path d="M 4 28 A {ARC_R} {ARC_R} 0 0 1 48 28" stroke={isComplete ? 'var(--color-celebrate)' : 'var(--color-activity)'} stroke-width="3" stroke-linecap="round" fill="none" stroke-dasharray={ARC_C} stroke-dashoffset={ARC_C * (1 - progress.done / progress.total)} class="arc-fill" />
+								</svg>
+								{#if isComplete}
+									<span class="day-arc-icon">
+										<Check size={14} strokeWidth={3} />
+									</span>
+								{/if}
+								<span class="day-arc-label" class:complete={isComplete}>
+									{#if isComplete}Done{:else}{progress.done}/{progress.total}{/if}
+								</span>
+							</div>
 						{/if}
 					</a>
 				{/if}
@@ -552,7 +564,9 @@
 	}
 
 	.day-card {
-		display: block;
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
 		width: 100%;
 		text-align: left;
 		font: inherit;
@@ -635,9 +649,8 @@
 		display: flex;
 		align-items: center;
 		gap: 0.35rem;
-		font-size: 0.75rem;
-		color: var(--color-text-muted);
-		margin-bottom: 0.5rem;
+		font-size: var(--text-xs);
+		color: var(--color-text-secondary);
 	}
 
 	.dot-sep {
@@ -645,37 +658,60 @@
 	}
 
 	/* Mini progress bar */
-	.mini-progress {
+	.day-card-content {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.day-arc-wrap {
+		position: relative;
+		width: 48px;
+		height: 44px;
+		flex-shrink: 0;
+	}
+
+	.day-arc {
+		width: 100%;
+		height: 28px;
+		display: block;
+	}
+
+	.arc-fill {
+		transition: stroke-dashoffset var(--duration-slow) var(--ease-out);
+	}
+
+	.day-arc-icon {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
+		justify-content: center;
+		position: absolute;
+		top: 14px;
+		left: 50%;
+		transform: translateX(-50%);
+		color: var(--color-activity);
 	}
 
-	.mini-progress-bar {
-		flex: 1;
-		height: 3px;
-		background: var(--color-border);
-		border-radius: 1.5px;
-		overflow: hidden;
-	}
-
-	.mini-progress-fill {
-		height: 100%;
-		background: var(--color-accent);
-		border-radius: 1.5px;
-		transition: width 0.3s ease;
-	}
-
-	.mini-progress-text {
-		font-family: var(--font-display);
-		font-size: 0.65rem;
-		color: var(--color-text-muted);
+	.day-arc-label {
+		position: absolute;
+		bottom: 0;
+		left: 50%;
+		transform: translateX(-50%);
+		font-family: var(--font-mono);
+		font-size: var(--text-xs);
+		color: var(--color-text-tertiary);
+		font-weight: var(--weight-bold);
 		white-space: nowrap;
 	}
 
-	.day-card.complete .mini-progress-text {
-		color: var(--color-accent);
+	.day-arc-label.complete {
+		font-family: var(--font-display);
+		font-size: var(--text-2xs);
+		font-weight: var(--weight-semibold);
+		letter-spacing: var(--tracking-wide);
+		text-transform: uppercase;
+		color: var(--color-text-tertiary);
 	}
+
 
 	/* ── Empty state ── */
 	.empty-state {

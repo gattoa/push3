@@ -92,10 +92,12 @@ export async function getFullPlan(
 
 export async function getGenerationContext(
 	supabase: SupabaseClient,
-	userId: string
+	userId: string,
+	timezone = 'UTC'
 ): Promise<GenerationContext | null> {
 	const { data, error } = await supabase.rpc('get_generation_context', {
-		p_user_id: userId
+		p_user_id: userId,
+		p_timezone: timezone
 	});
 
 	if (error) {

@@ -54,7 +54,7 @@ This is a personal project — not a commercial product. The goal is to build a 
 | **In-Gym Logging** | Must be super light and simple. Quick path: mark exercise as done in minimal taps. Detailed path: expand to log per-set weight, reps, incomplete sets. Both paths available — user chooses their depth. |
 | **Historical Data** | When a recurring exercise is assigned, a subtle indicator shows last performance so the user can aim to surpass it. PRs are denoted with an icon. |
 | **Equipment Swaps** | If equipment isn't available, swipe on the exercise tile to swap for an alternative. One-time action, no persistent gym memory, no location tracking. |
-| **Check-In** | End-of-week data collection (configurable day, default Sunday). The athlete submits: body weight, injury changes, equipment changes, progress photos (optional), and any preference adjustments. This data updates the athlete's profile and triggers plan generation. Check-in is an online-only operation — data goes directly to Supabase. |
+| **Check-In** | End-of-week data collection. The check-in day is automatically computed as the day after the user's last training day (e.g., if training days are Mon/Wed/Fri, check-in is Saturday). This ensures the AI sees a complete week of performance data before generating the next plan. The athlete submits: body weight, injury changes, equipment changes, progress photos (optional), and any preference adjustments. This data updates the athlete's profile and triggers plan generation. Check-in is an online-only operation — data goes directly to Supabase. *Design decision: the original spec called for a configurable check-in day. During implementation we determined that there is only one optimal answer — the day after the last training day. Exposing this as a setting risks users checking in mid-week, which loses data and degrades plan quality. Per Tesler's Law, complexity with a correct answer should be handled by the system.* |
 | **Plan Review** | After the new plan is generated, the athlete reviews their upcoming week before starting. Summary of last week's progress, celebration of achievements, and a preview of the new plan. Persists until the user engages with it, even if they don't open the app until Monday. Review is a *task* overlaid on a day, not a day type — a review can fall on a rest day or a day with a scheduled workout. The day's identity (Rest, Push, Pull, etc.) is unchanged; the review is indicated by a separate icon/badge. |
 | **Missed Days** | No mid-week adjustment. The missed day stays uncompleted. The AI accounts for the missed volume when generating next week's plan. |
 | **Adaptation** | AI uses all logged progress data to generate the next week's plan. Primary signal is quantitative (sets, reps, weight). The more context, the better the feedback loop. |
@@ -93,7 +93,7 @@ This is a personal project — not a commercial product. The goal is to build a 
 - Quick-complete and granular logging paths
 - Historical performance indicators and PR icons
 - Exercise swaps (swipe to replace)
-- Configurable review day with weekly summary and plan transition
+- Auto-computed check-in day (day after last training day) with weekly summary and plan transition
 - Profile page with progress data and personal records
 - Settings page
 

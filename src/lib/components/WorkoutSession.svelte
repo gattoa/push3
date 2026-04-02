@@ -4,7 +4,7 @@
 		ChevronDown, TrendingUp, Flame, Dumbbell, ArrowLeftRight
 	} from 'lucide-svelte';
 	import type { FullPlanDay, FullPlanExercise, FullPlanSet, ExerciseAlternative } from '$lib/types/database';
-	import { isPR as isPRUtil } from '$lib/utils/pr';
+	import { isPR as isPRUtil, estimatedE1RM } from '$lib/utils/pr';
 	import { invalidateAll } from '$app/navigation';
 	import { saveDrafts, loadDrafts, clearDraft } from '$lib/utils/set-draft';
 	import { addToast } from '$lib/stores/toast.svelte';
@@ -143,14 +143,39 @@
 	let allDone = $derived(completedSets + skippedSets === totalSets && totalSets > 0);
 
 	// ── PR Detection ──────────────────────────────────────────
+	// One PR per exercise: only the set with the highest e1RM that
+	// exceeds the stored best (or any set if first-time exercise).
 	function isPR(exerciseId: string, setId: string): boolean {
 		const s = setStates[setId];
 		if (!s || s.status !== 'completed' || !s.weight || !s.reps) return false;
 		const w = parseFloat(s.weight);
 		const r = parseInt(s.reps, 10);
+		const current = estimatedE1RM(w, r);
+		if (current === null) return false;
+
+		// Baseline to beat: server history or 0 (first-time exercise)
 		const hist = exerciseHistory[exerciseId];
-		if (!hist) return false;
-		return isPRUtil(w, r, hist.bestE1RM);
+		const baseline = hist?.bestE1RM ?? 0;
+		if (current <= baseline) return false;
+
+		// Find all completed sets for this exercise in the session
+		const exercise = day.exercises.find((ex) => ex.exercise_id === exerciseId);
+		if (!exercise) return false;
+
+		// This set is a PR only if it has the highest e1RM of the session.
+		// On ties, the later set (higher set_number) wins.
+		const thisSet = exercise.sets.find((st) => st.id === setId);
+		for (const set of exercise.sets) {
+			if (set.id === setId) continue;
+			const other = setStates[set.id];
+			if (!other || other.status !== 'completed' || !other.weight || !other.reps) continue;
+			const otherE1RM = estimatedE1RM(parseFloat(other.weight), parseInt(other.reps, 10));
+			if (otherE1RM === null) continue;
+			if (otherE1RM > current) return false;
+			if (otherE1RM === current && thisSet && set.set_number > thisSet.set_number) return false;
+		}
+
+		return true;
 	}
 
 	let prCount = $derived(
@@ -408,8 +433,48 @@
 		<a href="/plan" class="btn btn-secondary">View Weekly Plan</a>
 	</div>
 {:else}
-	<!-- ═══ Progress Bar (segmented) ═══ -->
-	{#if !allDone}
+	<!-- ═══ Progress Bar / Completion Summary ═══ -->
+	{#if allDone}
+		<div class="summary">
+			<div class="summary-header">
+				<div class="summary-ring">
+					<svg viewBox="0 0 28 28" fill="none">
+						<circle cx="14" cy="14" r="11" stroke="var(--color-celebrate)" stroke-width="2.5" fill="none" />
+					</svg>
+					<Check size={12} strokeWidth={3} class="summary-check" />
+				</div>
+				<h3 class="summary-title">Workout Complete</h3>
+			</div>
+
+			<div class="progress">
+				<div class="progress-track">
+					{#each segments as seg, i}
+						<div
+							class="progress-seg"
+							class:seg-activity={seg.color === 'activity'}
+							class:seg-celebrate={seg.color === 'celebrate'}
+							class:seg-danger={seg.color === 'danger'}
+							class:seg-pending={seg.color === 'pending'}
+						></div>
+					{/each}
+				</div>
+			</div>
+
+			<div class="summary-stats">
+				<span class="summary-stat summary-done">{completedSets} Done</span>
+				{#if skippedSets > 0}
+					<span class="summary-dot">&middot;</span>
+					<span class="summary-stat summary-skipped">{skippedSets} Skipped</span>
+				{/if}
+				{#if prCount > 0}
+					<span class="summary-dot">&middot;</span>
+					<span class="summary-stat summary-pr"><Trophy size={13} strokeWidth={2.5} /> {prCount} {prCount === 1 ? 'PR' : 'PRs'}</span>
+				{/if}
+				<span class="summary-dot">&middot;</span>
+				<span class="summary-stat summary-volume"><Flame size={13} strokeWidth={2} /> {totalVolume.toLocaleString()}</span>
+			</div>
+		</div>
+	{:else}
 		<div class="progress">
 			<div class="progress-track">
 				{#each segments as seg, i}
@@ -644,53 +709,7 @@
 		{/each}
 	</div>
 
-	<!-- ═══ Completion Summary ═══ -->
-	{#if allDone}
-		<div class="summary">
-			<div class="summary-header">
-				<div class="summary-progress-ring">
-					<svg viewBox="0 0 48 48" fill="none">
-						<circle cx="24" cy="24" r="20" stroke="var(--color-border)" stroke-width="3" fill="none" />
-						<circle cx="24" cy="24" r="20" stroke="var(--color-celebrate)" stroke-width="3" fill="none"
-							stroke-dasharray={Math.PI * 40}
-							stroke-dashoffset="0"
-							stroke-linecap="round"
-							transform="rotate(-90 24 24)"
-						/>
-					</svg>
-					<Check size={20} strokeWidth={3} class="summary-check" />
-				</div>
-				<h3 class="summary-title">Workout Complete</h3>
-			</div>
-			<div class="summary-stats">
-				<div class="summary-stat summary-done">
-					<span class="summary-val">{completedSets}</span>
-					<span class="summary-label">Done</span>
-				</div>
-				<div class="summary-stat summary-skipped">
-					<span class="summary-val">{skippedSets}</span>
-					<span class="summary-label">Skipped</span>
-				</div>
-				<div class="summary-stat">
-					<span class="summary-val summary-volume">
-						<Flame size={18} strokeWidth={2} />
-						{totalVolume.toLocaleString()}
-					</span>
-					<span class="summary-label">Volume</span>
-				</div>
-				{#if prCount > 0}
-					<div class="summary-stat summary-pr">
-						<span class="summary-val">
-							<Trophy size={18} strokeWidth={2} />
-							{prCount}
-						</span>
-						<span class="summary-label">PRs</span>
-					</div>
-				{/if}
-			</div>
-			<a href="/plan" class="btn btn-secondary summary-cta">View Weekly Plan</a>
-		</div>
-	{/if}
+
 {/if}
 
 <style>
@@ -1313,26 +1332,27 @@
 		background: var(--color-surface);
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius);
-		padding: var(--space-6);
-		text-align: center;
+		padding: var(--space-4) var(--space-5);
 		box-shadow: 0 4px 16px rgba(232, 185, 49, 0.06);
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3);
 	}
 
 	.summary-header {
 		display: flex;
-		flex-direction: column;
 		align-items: center;
-		gap: var(--space-3);
-		margin-bottom: var(--space-5);
+		gap: var(--space-2);
 	}
 
-	.summary-progress-ring {
+	.summary-ring {
 		position: relative;
-		width: 48px;
-		height: 48px;
+		width: 28px;
+		height: 28px;
+		flex-shrink: 0;
 	}
 
-	.summary-progress-ring svg {
+	.summary-ring svg {
 		width: 100%;
 		height: 100%;
 	}
@@ -1347,67 +1367,52 @@
 
 	.summary-title {
 		font-family: var(--font-display);
-		font-size: var(--text-xl);
+		font-size: var(--text-base);
 		font-weight: var(--weight-bold);
 		color: var(--color-celebrate);
 		letter-spacing: var(--tracking-tight);
 	}
 
+	.summary .progress {
+		margin: 0;
+	}
+
 	.summary-stats {
 		display: flex;
-		justify-content: center;
-		gap: var(--space-8);
-		margin-bottom: var(--space-6);
+		align-items: center;
+		flex-wrap: wrap;
+		gap: var(--space-1-5);
 	}
 
 	.summary-stat {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: var(--space-0-5);
-	}
-
-	.summary-val {
-		font-family: var(--font-display);
-		font-size: var(--text-2xl);
-		font-weight: var(--weight-extrabold);
-		line-height: 1;
-		min-height: 1.8rem;
 		display: inline-flex;
 		align-items: center;
 		gap: var(--space-1);
+		font-family: var(--font-body);
+		font-size: var(--text-sm);
+		font-weight: var(--weight-medium);
+		color: var(--color-text-secondary);
 	}
 
-	.summary-volume {
-		font-size: var(--text-xl);
-	}
-
-	.summary-label {
-		font-size: var(--text-2xs);
-		color: var(--color-text-tertiary);
-		text-transform: uppercase;
-		letter-spacing: var(--tracking-wider);
-		font-weight: var(--weight-semibold);
-	}
-
-	.summary-done .summary-val {
+	.summary-done {
 		color: var(--color-activity);
 	}
 
-	.summary-skipped .summary-val {
-		color: var(--color-danger);
+	.summary-skipped {
+		color: var(--color-text-secondary);
 	}
 
-	.summary-pr .summary-val {
+	.summary-pr {
 		color: var(--color-celebrate);
 	}
 
-	.summary-pr .summary-label {
-		color: var(--color-celebrate);
+	.summary-volume {
+		color: var(--color-text-tertiary);
 	}
 
-	.summary-cta {
-		margin-top: var(--space-2);
+	.summary-dot {
+		color: var(--color-text-tertiary);
+		font-size: var(--text-xs);
 	}
 
 	/* ═══ Buttons ═══ */

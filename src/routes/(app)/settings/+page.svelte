@@ -173,7 +173,10 @@
 			trainingDays = [...trainingDays, dayIndex].sort((a, b) => a - b);
 		}
 		if (trainingDays.length >= 2) {
-			debouncedSave({ training_days: trainingDays });
+			// Auto-compute check-in day: day after the last training day (wraps Sun→Mon)
+			const lastTrainingDay = Math.max(...trainingDays);
+			const checkInDay = (lastTrainingDay + 1) % 7;
+			debouncedSave({ training_days: trainingDays, check_in_day: checkInDay });
 		}
 	}
 
