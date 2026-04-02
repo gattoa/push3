@@ -2,7 +2,7 @@
 	import type { FullPlan, FullPlanDay } from '$lib/types/database';
 	import SegmentedControl from '$lib/components/SegmentedControl.svelte';
 	import PlanSkeleton from '$lib/components/PlanSkeleton.svelte';
-	import { ClipboardCheck, Pencil } from 'lucide-svelte';
+	import { ClipboardCheck } from 'lucide-svelte';
 	import { page } from '$app/state';
 	import { invalidateAll } from '$app/navigation';
 	import { onDestroy } from 'svelte';
@@ -180,20 +180,15 @@
 				body: JSON.stringify({ day_id_a: idA, day_id_b: idB })
 			});
 
-			const data = await res.json();
-			console.log('[swap-days] Response:', JSON.stringify(data, null, 2));
-
 			if (res.ok) {
 				await invalidateAll();
 				if (dayA && dayB) {
 					addToast(`Swapped ${DAY_NAMES[dayA.day_index]} ↔ ${DAY_NAMES[dayB.day_index]}`, 'success');
 				}
 			} else {
-				console.error('[swap-days] Error:', data);
 				addToast('Swap failed — try again', 'error');
 			}
-		} catch (err) {
-			console.error('[swap-days] Network error:', err);
+		} catch {
 			addToast('Network error — check your connection', 'error');
 		} finally {
 			swapping = false;
@@ -216,9 +211,7 @@
 			{#if editMode}
 				<button class="edit-btn active" onclick={exitEditMode}>Done</button>
 			{:else if plan && plan.days.length > 1}
-				<button class="edit-btn" onclick={() => editMode = true} title="Edit schedule">
-					<Pencil size={16} strokeWidth={2} />
-				</button>
+				<button class="edit-btn" onclick={() => editMode = true}>Edit</button>
 			{:else}
 				<div class="header-slot"></div>
 			{/if}
@@ -512,8 +505,8 @@
 
 	/* ── Edit mode ── */
 	.edit-btn {
-		width: 40px;
-		height: 40px;
+		min-width: 44px;
+		height: 44px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -521,11 +514,10 @@
 		border: none;
 		color: var(--color-text-secondary);
 		cursor: pointer;
-		border-radius: var(--radius);
 		flex-shrink: 0;
 		font-family: var(--font-display);
-		font-size: var(--text-xs);
-		font-weight: var(--weight-semibold);
+		font-size: var(--text-sm);
+		font-weight: var(--weight-medium);
 		transition: color var(--duration-fast);
 		-webkit-tap-highlight-color: transparent;
 	}
@@ -536,6 +528,7 @@
 
 	.edit-btn.active {
 		color: var(--color-activity);
+		font-weight: var(--weight-semibold);
 	}
 
 	.edit-mode-title {

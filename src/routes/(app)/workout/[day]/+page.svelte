@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ArrowLeft, Pencil } from 'lucide-svelte';
+	import { ArrowLeft } from 'lucide-svelte';
 	import SegmentedControl from '$lib/components/SegmentedControl.svelte';
 	import WorkoutSession from '$lib/components/WorkoutSession.svelte';
 	import { navigating } from '$app/stores';
@@ -44,9 +44,7 @@
 			{#if editMode}
 				<button class="edit-btn active" onclick={() => editMode = false}>Done</button>
 			{:else if day.exercises.length > 1}
-				<button class="edit-btn" onclick={() => editMode = true} title="Reorder exercises">
-					<Pencil size={16} strokeWidth={2} />
-				</button>
+				<button class="edit-btn" onclick={() => editMode = true}>Edit</button>
 			{:else}
 				<div class="header-slot"></div>
 			{/if}
@@ -141,8 +139,8 @@
 	}
 
 	.edit-btn {
-		width: 40px;
-		height: 40px;
+		min-width: 44px;
+		height: 44px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -150,11 +148,10 @@
 		border: none;
 		color: var(--color-text-secondary);
 		cursor: pointer;
-		border-radius: var(--radius);
 		flex-shrink: 0;
 		font-family: var(--font-display);
-		font-size: var(--text-xs);
-		font-weight: var(--weight-semibold);
+		font-size: var(--text-sm);
+		font-weight: var(--weight-medium);
 		transition: color var(--duration-fast);
 		-webkit-tap-highlight-color: transparent;
 	}
@@ -165,6 +162,7 @@
 
 	.edit-btn.active {
 		color: var(--color-activity);
+		font-weight: var(--weight-semibold);
 	}
 
 	.edit-mode-title {
