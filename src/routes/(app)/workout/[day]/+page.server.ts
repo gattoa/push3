@@ -3,7 +3,7 @@ import type { PageServerLoad } from './$types';
 import { getFullPlan, getExerciseHistory } from '$lib/server/supabase';
 import { getCurrentMonday } from '$lib/utils/date';
 
-export const load: PageServerLoad = async ({ params, locals: { safeGetSession, supabase } }) => {
+export const load: PageServerLoad = async ({ params, locals: { safeGetSession, supabase, timezone } }) => {
 	const { user } = await safeGetSession();
 	if (!user) redirect(303, '/');
 
@@ -12,7 +12,7 @@ export const load: PageServerLoad = async ({ params, locals: { safeGetSession, s
 		error(400, 'Invalid day index. Must be 0-6.');
 	}
 
-	const currentMonday = getCurrentMonday();
+	const currentMonday = getCurrentMonday(timezone);
 	const fullPlan = await getFullPlan(supabase, user.id, { weekStartDate: currentMonday });
 
 	if (!fullPlan || !fullPlan.plan) {

@@ -10,13 +10,13 @@ import { computeAlternativesForPlan } from '$lib/server/alternatives';
 // Vercel Hobby plan defaults to 10s — Claude calls take 10-20s
 export const config = { maxDuration: 60 };
 
-export const GET: RequestHandler = async ({ locals: { safeGetSession, supabase } }) => {
+export const GET: RequestHandler = async ({ locals: { safeGetSession, supabase, timezone } }) => {
 	const { user } = await safeGetSession();
 	if (!user) return json({ error: 'Not authenticated' }, { status: 401 });
 
 	// Check for active/generating plan for the current calendar week
 	const { getCurrentMonday } = await import('$lib/utils/date');
-	const currentMonday = getCurrentMonday();
+	const currentMonday = getCurrentMonday(timezone);
 
 	const { data: plan } = await supabase
 		.from('weekly_plans')

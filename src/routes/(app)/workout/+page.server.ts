@@ -1,17 +1,14 @@
 import { redirect, error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { getFullPlan } from '$lib/server/supabase';
-import { getCurrentMonday } from '$lib/utils/date';
+import { getCurrentMonday, getTodayIndex } from '$lib/utils/date';
 
-export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase } }) => {
+export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase, timezone } }) => {
 	const { user } = await safeGetSession();
 	if (!user) redirect(303, '/');
 
-	// Map JS day (0=Sun) to our scheme (0=Mon)
-	const jsDay = new Date().getDay();
-	const dayIndex = jsDay === 0 ? 6 : jsDay - 1;
-
-	const currentMonday = getCurrentMonday();
+	const dayIndex = getTodayIndex(timezone);
+	const currentMonday = getCurrentMonday(timezone);
 	const fullPlan = await getFullPlan(supabase, user.id, { weekStartDate: currentMonday });
 
 	if (!fullPlan || !fullPlan.plan) {
@@ -99,7 +96,7 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
 	}
 
 	// ── Banner logic ──
-	const isCheckInDay = jsDay === 0; // Sunday
+	const isCheckInDay = dayIndex === 6; // Sunday (dayIndex 6 = Sunday)
 
 	const planCreatedAt = new Date(fullPlan.plan.created_at);
 	const hoursSinceGeneration = (Date.now() - planCreatedAt.getTime()) / (1000 * 60 * 60);
@@ -119,6 +116,7 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
 		plan: fullPlan.plan,
 		day,
 		dayIndex,
+		timezone,
 		unitPref: settings?.unit_pref ?? 'lb',
 		exerciseHistory,
 		banner: showCheckInBanner ? 'check-in' as const : showPlanReviewBanner ? 'plan-review' as const : null

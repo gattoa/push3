@@ -17,6 +17,16 @@
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">
+		<script>
+			// Set timezone cookie so the server can compute correct local dates.
+			// Runs once per session — only updates if timezone changes (e.g. travel, DST).
+			try {
+				var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+				if (tz && document.cookie.indexOf('tz=' + tz) === -1) {
+					document.cookie = 'tz=' + tz + ';path=/;max-age=31536000;SameSite=Lax';
+				}
+			} catch (e) {}
+		</script>
 		<div style="display: contents">%sveltekit.body%</div>
 	</body>
 </html>
