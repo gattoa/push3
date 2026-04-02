@@ -7,16 +7,18 @@
 	import { shouldShowBanner, dismissBanner } from '$lib/utils/banner';
 	import { navigating } from '$app/stores';
 	import type { FullPlanDay } from '$lib/types/database';
+	import { getTodayDisplay } from '$lib/utils/date';
 
 	let { data } = $props();
 	const day = $derived(data.day as FullPlanDay);
 	const dayIndex = $derived(data.dayIndex as number);
+	const timezone = $derived(data.timezone as string);
 	const unitPref = $derived(data.unitPref as string);
 	const exerciseHistory = $derived(data.exerciseHistory as Record<string, { lastWeight: number; lastReps: number; bestE1RM: number }>);
 	const initialBanner = $derived(data.banner as 'check-in' | 'plan-review' | null);
 
 	const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-	const todayDate = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+	const todayDate = $derived(getTodayDisplay(timezone));
 
 	// Skip pushUp animation on client-side navigation
 	let isClientNav = $state(false);

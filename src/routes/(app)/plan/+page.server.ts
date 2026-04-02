@@ -1,20 +1,19 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { getFullPlan } from '$lib/server/supabase';
-import { getCurrentMonday } from '$lib/utils/date';
+import { getCurrentMonday, getTodayIndex } from '$lib/utils/date';
 
-export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase } }) => {
+export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase, timezone } }) => {
 	const { user } = await safeGetSession();
 	if (!user) redirect(303, '/');
 
-	const currentMonday = getCurrentMonday();
+	const currentMonday = getCurrentMonday(timezone);
 
 	// Request this week's plan specifically — not "latest"
 	const fullPlan = await getFullPlan(supabase, user.id, { weekStartDate: currentMonday });
 
 	// Compute today's day index for highlighting
-	const jsDay = new Date().getDay();
-	const todayIndex = jsDay === 0 ? 6 : jsDay - 1;
+	const todayIndex = getTodayIndex(timezone);
 
 	// If no active plan, check if one is currently generating
 	let generationStatus: 'none' | 'generating' | 'ready' = fullPlan ? 'ready' : 'none';

@@ -555,7 +555,7 @@
 												<input
 													type="number"
 													inputmode="decimal"
-													class="set-input"
+													class="set-input set-input-weight"
 													placeholder={set.target_weight != null ? String(set.target_weight) : '—'}
 													bind:value={s.weight}
 													readonly={s.status !== 'pending'}
@@ -1205,7 +1205,7 @@
 	}
 
 	.set-input {
-		width: 2.5ch;
+		width: 2ch;
 		min-width: 1.5ch;
 		background: transparent;
 		border: none;
@@ -1217,6 +1217,10 @@
 		outline: none;
 		-moz-appearance: textfield;
 		appearance: textfield;
+	}
+
+	.set-input-weight {
+		width: 4ch;
 	}
 
 	.set-input::placeholder {

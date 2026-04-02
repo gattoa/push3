@@ -20,6 +20,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 	});
 
+	// Read client timezone from cookie (set by inline script in app.html)
+	event.locals.timezone = event.cookies.get('tz') || 'UTC';
+
 	event.locals.safeGetSession = async () => {
 		const {
 			data: { session }
