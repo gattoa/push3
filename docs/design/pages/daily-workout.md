@@ -43,11 +43,10 @@ This is the app's home screen post-onboarding. It shows today's prescribed worko
 │  │    🏋 First time    ◠ 1/3 ▾│  │     Red arc sliver for skip
 │  └───────────────────────────┘  │
 │                                  │
-│  ┌─ Completion Summary ──────┐  │  ← Only when all sets resolved
-│  │    ◉ ✓                     │  │     Gold ring + check
-│  │  Workout Complete          │  │     Celebrate (gold) theme
-│  │  7 Done · 2 Skip · 8,400  │  │
-│  │  [View Weekly Plan]        │  │
+│  ┌─ Completion Summary ──────┐  │  ← Replaces progress bar when all sets resolved
+│  │ ◉✓ Workout Complete       │  │     Inline gold ring + gold title
+│  │ ██████████████████████████│  │     Full progress bar (mint/gold/rose segments)
+│  │ 7 Done · 🏆 1 PR · 🔥8400│  │     Compact inline stats
 │  └───────────────────────────┘  │
 ├─────────────────────────────────┤
 │  [ Workout ]    [ Progress ]    │  ← Bottom nav (planned, currently hidden)
@@ -219,12 +218,13 @@ Inputs appear as **plain inline text** at rest — no visible borders or backgro
 - **After swap:** Rationale is cleared (set to null). The replacement exercise has no rationale.
 
 ### Completion Summary
-- Appears when **all sets have a status** (no pending). Replaces the progress bar.
+- Appears when **all sets have a status** (no pending). Replaces the progress bar at the top of the exercise list.
 - **Theme:** Celebrate (gold) — completing a workout is an achievement.
-- **Progress ring:** 48×48px SVG circle, gold stroke, gold check icon centered.
-- **Title:** "Workout Complete" in `--color-celebrate`, display font bold.
-- **Stats row:** Done (mint) · Skipped (rose) · Volume with Flame icon · PRs with Trophy icon (gold, conditional)
-- **CTA:** "View Weekly Plan" secondary button → `/plan`
+- **Layout:** Title → Progress Bar → Stats (top-down: statement → visual proof → details).
+- **Header:** Inline layout — small gold ring (28px) with check icon + "Workout Complete" in `--color-celebrate`, display font bold. Compact, not centered/stacked.
+- **Progress bar:** Full segmented bar (same as during-workout bar) — mint, gold, and rose segments showing the complete picture. The bar the user watched fill up is now complete inside the card.
+- **Stats row:** Compact inline text with dot separators. Done (mint) · Skipped (default text, hidden if zero — "the bar already told that story") · PRs with Trophy icon (gold, conditional) · Volume with Flame icon (tertiary).
+- **No CTA:** Navigation to weekly plan is handled by the segmented control and bottom nav. The summary card is pure celebration, no competing navigation action.
 - **Shadow:** Subtle gold glow (`rgba(232, 185, 49, 0.06)`)
 
 ### Today Detection
