@@ -20,8 +20,37 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 	});
 
-	// Read client timezone from cookie (set by inline script in app.html)
-	event.locals.timezone = event.cookies.get('tz') || 'UTC';
+	// Read client timezone from cookie.
+	// If missing on a page navigation, return a minimal page that detects the
+	// timezone, sets the cookie, and reloads — so the very first render is correct.
+	const tz = event.cookies.get('tz');
+	const reqPath = event.url.pathname;
+	const isPageRequest =
+		event.request.headers.get('accept')?.includes('text/html') &&
+		!reqPath.startsWith('/api/') &&
+		!reqPath.startsWith('/auth/');
+
+	if (!tz && isPageRequest) {
+		return new Response(
+			`<!DOCTYPE html><html><head><meta charset="utf-8"></head><body><script>
+				try {
+					var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+					document.cookie = 'tz=' + tz + ';path=/;max-age=31536000;SameSite=Lax';
+				} catch(e) {
+					document.cookie = 'tz=UTC;path=/;max-age=31536000;SameSite=Lax';
+				}
+				location.reload();
+			</script></body></html>`,
+			{
+				headers: {
+					'content-type': 'text/html',
+					'cache-control': 'no-store'
+				}
+			}
+		);
+	}
+
+	event.locals.timezone = tz || 'UTC';
 
 	event.locals.safeGetSession = async () => {
 		const {
