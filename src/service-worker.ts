@@ -6,13 +6,13 @@
 import { build, files, version } from '$service-worker';
 
 const CACHE = `cache-${version}`;
-const ASSETS = [...build, ...files];
+const ASSETS = new Set([...build, ...files]);
 
 self.addEventListener('install', (event: ExtendableEvent) => {
 	event.waitUntil(
 		caches
 			.open(CACHE)
-			.then((cache) => cache.addAll(ASSETS))
+			.then((cache) => cache.addAll([...ASSETS]))
 			.then(() => (self as unknown as ServiceWorkerGlobalScope).skipWaiting())
 	);
 });
@@ -31,22 +31,27 @@ self.addEventListener('activate', (event: ExtendableEvent) => {
 self.addEventListener('fetch', (event: FetchEvent) => {
 	if (event.request.method !== 'GET') return;
 
+	const url = new URL(event.request.url);
+
+	// Only cache-first for known static assets (build output + static files).
+	// Everything else (pages, API calls, data fetches) goes network-first
+	// so users always see fresh data.
+	if (ASSETS.has(url.pathname)) {
+		event.respondWith(
+			caches.open(CACHE).then(async (cache) => {
+				const cached = await cache.match(event.request);
+				return cached ?? fetch(event.request);
+			})
+		);
+		return;
+	}
+
+	// Network-first for pages and data
 	event.respondWith(
-		(async () => {
-			const cache = await caches.open(CACHE);
-			const cachedResponse = await cache.match(event.request);
-
-			if (cachedResponse) return cachedResponse;
-
-			try {
-				const response = await fetch(event.request);
-				if (response.status === 200) {
-					cache.put(event.request, response.clone());
-				}
-				return response;
-			} catch {
-				return new Response('Offline', { status: 503 });
-			}
-		})()
+		fetch(event.request).catch(() => {
+			return caches.match(event.request).then((cached) => {
+				return cached ?? new Response('Offline', { status: 503 });
+			});
+		})
 	);
 });

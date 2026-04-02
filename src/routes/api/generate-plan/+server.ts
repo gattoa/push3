@@ -15,12 +15,8 @@ export const GET: RequestHandler = async ({ locals: { safeGetSession, supabase }
 	if (!user) return json({ error: 'Not authenticated' }, { status: 401 });
 
 	// Check for active/generating plan for the current calendar week
-	const now = new Date();
-	const jsDay = now.getDay();
-	const mondayOffset = jsDay === 0 ? -6 : 1 - jsDay;
-	const monday = new Date(now);
-	monday.setDate(now.getDate() + mondayOffset);
-	const currentMonday = monday.toISOString().split('T')[0];
+	const { getCurrentMonday } = await import('$lib/utils/date');
+	const currentMonday = getCurrentMonday();
 
 	const { data: plan } = await supabase
 		.from('weekly_plans')

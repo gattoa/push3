@@ -144,6 +144,61 @@
 		}
 		return { done, total };
 	}
+
+	// ── Edit Mode (tap-to-select, tap-to-swap) ───────────────
+	let editMode = $state(false);
+	let selectedDayId = $state<string | null>(null);
+	let swapping = $state(false);
+
+	function handleDayTap(day: FullPlanDay) {
+		if (!editMode) return;
+
+		if (selectedDayId === null) {
+			// First tap: select this day
+			selectedDayId = day.id;
+		} else if (selectedDayId === day.id) {
+			// Tapped the same day: deselect
+			selectedDayId = null;
+		} else {
+			// Second tap on a different day: perform the swap
+			performSwap(selectedDayId, day.id);
+		}
+	}
+
+	async function performSwap(idA: string, idB: string) {
+		if (swapping) return;
+		swapping = true;
+		selectedDayId = null;
+
+		const dayA = sortedDays.find((d) => d.id === idA);
+		const dayB = sortedDays.find((d) => d.id === idB);
+
+		try {
+			const res = await fetch('/api/swap-days', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ day_id_a: idA, day_id_b: idB })
+			});
+
+			if (res.ok) {
+				await invalidateAll();
+				if (dayA && dayB) {
+					addToast(`Swapped ${DAY_NAMES[dayA.day_index]} ↔ ${DAY_NAMES[dayB.day_index]}`, 'success');
+				}
+			} else {
+				addToast('Swap failed — try again', 'error');
+			}
+		} catch {
+			addToast('Network error — check your connection', 'error');
+		} finally {
+			swapping = false;
+		}
+	}
+
+	function exitEditMode() {
+		editMode = false;
+		selectedDayId = null;
+	}
 </script>
 
 <svelte:head>
@@ -153,11 +208,35 @@
 <div class="agenda-page">
 	<header class="agenda-header">
 		<div class="header-bar">
-			<div class="header-slot"></div>
-			<SegmentedControl active="week" />
-			<AvatarMenu />
+			{#if editMode}
+				<button class="edit-btn active" onclick={exitEditMode}>Done</button>
+			{:else if plan && plan.days.length > 1}
+				<button class="edit-btn" onclick={() => editMode = true}>Edit</button>
+			{:else}
+				<div class="header-slot"></div>
+			{/if}
+			{#if editMode}
+				<span class="edit-mode-title">Edit Schedule</span>
+			{:else}
+				<SegmentedControl active="week" />
+			{/if}
+			{#if editMode}
+				<div class="header-slot"></div>
+			{:else}
+				<AvatarMenu />
+			{/if}
 		</div>
-		<h1 class="header-title">This Week</h1>
+		{#if editMode}
+			<p class="edit-hint">Tap a day, then tap another to swap</p>
+		{:else}
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<h1
+			class="header-title"
+			onclick={() => { invalidateAll(); }}
+			onkeydown={(e) => { if (e.key === 'Enter') invalidateAll(); }}
+			title="Refresh"
+		>This Week</h1>
+		{/if}
 	</header>
 
 	{#if plan}
@@ -168,48 +247,98 @@
 				{@const isToday = day.day_index === todayIndex}
 				{@const isRest = day.exercises.length === 0}
 				{@const isComplete = progress.total > 0 && progress.done === progress.total}
-				<a
-					href="/workout/{day.day_index}"
-					class="day-card"
-					class:today={isToday}
-					class:rest={isRest}
-					class:complete={isComplete}
-				>
-					<div class="day-card-top">
-						<span class="day-name">{DAY_NAMES[day.day_index]}</span>
-						{#if isToday}
-							<span class="today-badge">Today</span>
-						{/if}
-					</div>
+				{@const isSelected = editMode && selectedDayId === day.id}
 
-					{#if isRest}
-						<span class="rest-label">Rest Day</span>
-					{:else}
-						<span class="split-label">{day.split_label}</span>
-						<div class="day-card-stats">
-							<span>{day.exercises.length} exercises</span>
-							<span class="dot-sep">&middot;</span>
-							<span>{progress.total} sets</span>
+				{#if editMode}
+					<button
+						class="day-card"
+						class:today={isToday}
+						class:rest={isRest}
+						class:complete={isComplete}
+						class:selected={isSelected}
+						class:swapping
+						onclick={() => handleDayTap(day)}
+						disabled={swapping}
+					>
+						<div class="day-card-top">
+							<span class="day-name">{DAY_NAMES[day.day_index]}</span>
+							{#if isToday}
+								<span class="today-badge">Today</span>
+							{/if}
 						</div>
-						{#if progress.total > 0}
-							<div class="mini-progress">
-								<div class="mini-progress-bar">
-									<div
-										class="mini-progress-fill"
-										style="width: {(progress.done / progress.total) * 100}%"
-									></div>
-								</div>
-								<span class="mini-progress-text">
-									{#if isComplete}
-										&#10003;
-									{:else}
-										{progress.done}/{progress.total}
-									{/if}
-								</span>
+
+						{#if isRest}
+							<span class="rest-label">Rest Day</span>
+						{:else}
+							<span class="split-label">{day.split_label}</span>
+							<div class="day-card-stats">
+								<span>{day.exercises.length} exercises</span>
+								<span class="dot-sep">&middot;</span>
+								<span>{progress.total} sets</span>
 							</div>
+							{#if progress.total > 0}
+								<div class="mini-progress">
+									<div class="mini-progress-bar">
+										<div
+											class="mini-progress-fill"
+											style="width: {(progress.done / progress.total) * 100}%"
+										></div>
+									</div>
+									<span class="mini-progress-text">
+										{#if isComplete}
+											&#10003;
+										{:else}
+											{progress.done}/{progress.total}
+										{/if}
+									</span>
+								</div>
+							{/if}
 						{/if}
-					{/if}
-				</a>
+					</button>
+				{:else}
+					<a
+						href="/workout/{day.day_index}"
+						class="day-card"
+						class:today={isToday}
+						class:rest={isRest}
+						class:complete={isComplete}
+					>
+						<div class="day-card-top">
+							<span class="day-name">{DAY_NAMES[day.day_index]}</span>
+							{#if isToday}
+								<span class="today-badge">Today</span>
+							{/if}
+						</div>
+
+						{#if isRest}
+							<span class="rest-label">Rest Day</span>
+						{:else}
+							<span class="split-label">{day.split_label}</span>
+							<div class="day-card-stats">
+								<span>{day.exercises.length} exercises</span>
+								<span class="dot-sep">&middot;</span>
+								<span>{progress.total} sets</span>
+							</div>
+							{#if progress.total > 0}
+								<div class="mini-progress">
+									<div class="mini-progress-bar">
+										<div
+											class="mini-progress-fill"
+											style="width: {(progress.done / progress.total) * 100}%"
+										></div>
+									</div>
+									<span class="mini-progress-text">
+										{#if isComplete}
+											&#10003;
+										{:else}
+											{progress.done}/{progress.total}
+										{/if}
+									</span>
+								</div>
+							{/if}
+						{/if}
+					</a>
+				{/if}
 			{/each}
 		</div>
 
@@ -285,6 +414,13 @@
 		font-size: 1.25rem;
 		font-weight: 700;
 		text-align: center;
+		cursor: pointer;
+		-webkit-tap-highlight-color: transparent;
+		user-select: none;
+	}
+
+	.header-title:active {
+		opacity: 0.5;
 	}
 
 	/* ── Generation status card ── */
@@ -367,6 +503,47 @@
 		background: var(--color-surface-active);
 	}
 
+	/* ── Edit mode ── */
+	.edit-btn {
+		min-width: 44px;
+		height: 44px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: transparent;
+		border: none;
+		color: var(--color-text-secondary);
+		cursor: pointer;
+		flex-shrink: 0;
+		font-family: var(--font-display);
+		font-size: var(--text-sm);
+		font-weight: var(--weight-medium);
+		transition: color var(--duration-fast);
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	.edit-btn:hover {
+		color: var(--color-text);
+	}
+
+	.edit-btn.active {
+		color: var(--color-activity);
+		font-weight: var(--weight-semibold);
+	}
+
+	.edit-mode-title {
+		font-family: var(--font-display);
+		font-size: var(--text-sm);
+		font-weight: var(--weight-semibold);
+		color: var(--color-text);
+	}
+
+	.edit-hint {
+		font-size: var(--text-xs);
+		color: var(--color-text-secondary);
+		text-align: center;
+	}
+
 	/* ── Day cards ── */
 	.day-list {
 		display: flex;
@@ -376,6 +553,10 @@
 
 	.day-card {
 		display: block;
+		width: 100%;
+		text-align: left;
+		font: inherit;
+		cursor: pointer;
 		background: var(--color-surface);
 		border: 1.5px solid var(--color-border);
 		border-radius: var(--radius);
@@ -399,6 +580,16 @@
 
 	.day-card.rest:hover {
 		opacity: 0.8;
+	}
+
+	.day-card.selected {
+		border-color: var(--color-activity);
+		box-shadow: var(--shadow-glow);
+	}
+
+	.day-card.swapping {
+		opacity: 0.5;
+		pointer-events: none;
 	}
 
 	.day-card-top {
