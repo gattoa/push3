@@ -4,7 +4,7 @@
 		ChevronDown, TrendingUp, Flame, Dumbbell, ArrowLeftRight
 	} from 'lucide-svelte';
 	import type { FullPlanDay, FullPlanExercise, FullPlanSet, ExerciseAlternative } from '$lib/types/database';
-	import { isPR as isPRUtil } from '$lib/utils/pr';
+	import { isPR as isPRUtil, estimatedE1RM } from '$lib/utils/pr';
 	import { invalidateAll } from '$app/navigation';
 	import { saveDrafts, loadDrafts, clearDraft } from '$lib/utils/set-draft';
 	import { addToast } from '$lib/stores/toast.svelte';
@@ -143,14 +143,39 @@
 	let allDone = $derived(completedSets + skippedSets === totalSets && totalSets > 0);
 
 	// ── PR Detection ──────────────────────────────────────────
+	// One PR per exercise: only the set with the highest e1RM that
+	// exceeds the stored best (or any set if first-time exercise).
 	function isPR(exerciseId: string, setId: string): boolean {
 		const s = setStates[setId];
 		if (!s || s.status !== 'completed' || !s.weight || !s.reps) return false;
 		const w = parseFloat(s.weight);
 		const r = parseInt(s.reps, 10);
+		const current = estimatedE1RM(w, r);
+		if (current === null) return false;
+
+		// Baseline to beat: server history or 0 (first-time exercise)
 		const hist = exerciseHistory[exerciseId];
-		if (!hist) return false;
-		return isPRUtil(w, r, hist.bestE1RM);
+		const baseline = hist?.bestE1RM ?? 0;
+		if (current <= baseline) return false;
+
+		// Find all completed sets for this exercise in the session
+		const exercise = day.exercises.find((ex) => ex.exercise_id === exerciseId);
+		if (!exercise) return false;
+
+		// This set is a PR only if it has the highest e1RM of the session.
+		// On ties, the later set (higher set_number) wins.
+		const thisSet = exercise.sets.find((st) => st.id === setId);
+		for (const set of exercise.sets) {
+			if (set.id === setId) continue;
+			const other = setStates[set.id];
+			if (!other || other.status !== 'completed' || !other.weight || !other.reps) continue;
+			const otherE1RM = estimatedE1RM(parseFloat(other.weight), parseInt(other.reps, 10));
+			if (otherE1RM === null) continue;
+			if (otherE1RM > current) return false;
+			if (otherE1RM === current && thisSet && set.set_number > thisSet.set_number) return false;
+		}
+
+		return true;
 	}
 
 	let prCount = $derived(

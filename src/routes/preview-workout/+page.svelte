@@ -110,10 +110,28 @@
 		if (!s || s.status !== 'completed' || !s.weight || !s.reps) return false;
 		const w = parseFloat(s.weight);
 		const r = parseInt(s.reps, 10);
-		if (w <= 0 || r <= 0) return false;
+		const current = computeE1RM(w, r);
+		if (current === null || current <= 0) return false;
+
 		const hist = exerciseHistory[exerciseId];
-		if (!hist) return false;
-		return computeE1RM(w, r) > hist.bestE1RM;
+		const baseline = hist?.bestE1RM ?? 0;
+		if (current <= baseline) return false;
+
+		const exercise = day.exercises.find((ex: any) => ex.exercise_id === exerciseId);
+		if (!exercise) return false;
+
+		const thisSet = exercise.sets.find((st: any) => st.id === setId);
+		for (const set of exercise.sets) {
+			if (set.id === setId) continue;
+			const other = setStates[set.id];
+			if (!other || other.status !== 'completed' || !other.weight || !other.reps) continue;
+			const otherE1RM = computeE1RM(parseFloat(other.weight), parseInt(other.reps, 10));
+			if (otherE1RM === null) continue;
+			if (otherE1RM > current) return false;
+			if (otherE1RM === current && thisSet && set.set_number > thisSet.set_number) return false;
+		}
+
+		return true;
 	}
 
 	let prCount = $derived(
