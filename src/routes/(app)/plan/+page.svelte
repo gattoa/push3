@@ -131,8 +131,8 @@
 		plan ? [...plan.days].sort((a, b) => a.day_index - b.day_index) : []
 	);
 
-	// Arc constants (same proportions as exercise arcs, slightly smaller)
-	const ARC_R = 18;
+	// Arc constants (matches exercise arc proportions)
+	const ARC_R = 22;
 	const ARC_C = Math.PI * ARC_R;
 
 	function getDayProgress(day: FullPlanDay): { done: number; total: number; hasPR: boolean } {
@@ -291,12 +291,12 @@
 						</div>
 						{#if !isRest && progress.done > 0}
 							<div class="day-arc-wrap">
-								<svg class="day-arc" viewBox="0 0 40 24" fill="none">
-									<path d="M 2 22 A {ARC_R} {ARC_R} 0 0 1 38 22" stroke="var(--color-border)" stroke-width="2.5" stroke-linecap="round" fill="none" />
-									<path d="M 2 22 A {ARC_R} {ARC_R} 0 0 1 38 22" stroke={isComplete && progress.hasPR ? 'var(--color-celebrate)' : 'var(--color-activity)'} stroke-width="2.5" stroke-linecap="round" fill="none" stroke-dasharray={ARC_C} stroke-dashoffset={ARC_C * (1 - progress.done / progress.total)} class="arc-fill" />
+								<svg class="day-arc" viewBox="0 0 52 32" fill="none">
+									<path d="M 4 28 A {ARC_R} {ARC_R} 0 0 1 48 28" stroke="var(--color-border)" stroke-width="3" stroke-linecap="round" fill="none" />
+									<path d="M 4 28 A {ARC_R} {ARC_R} 0 0 1 48 28" stroke={isComplete && progress.hasPR ? 'var(--color-celebrate)' : 'var(--color-activity)'} stroke-width="3" stroke-linecap="round" fill="none" stroke-dasharray={ARC_C} stroke-dashoffset={ARC_C * (1 - progress.done / progress.total)} class="arc-fill" />
 								</svg>
 								<span class="day-arc-label" class:complete={isComplete} class:has-pr={isComplete && progress.hasPR}>
-									{#if isComplete}&#10003;{:else}{progress.done}/{progress.total}{/if}
+									{#if isComplete}Done{:else}{progress.done}/{progress.total}{/if}
 								</span>
 							</div>
 						{/if}
@@ -330,12 +330,12 @@
 						</div>
 						{#if !isRest && progress.done > 0}
 							<div class="day-arc-wrap">
-								<svg class="day-arc" viewBox="0 0 40 24" fill="none">
-									<path d="M 2 22 A {ARC_R} {ARC_R} 0 0 1 38 22" stroke="var(--color-border)" stroke-width="2.5" stroke-linecap="round" fill="none" />
-									<path d="M 2 22 A {ARC_R} {ARC_R} 0 0 1 38 22" stroke={isComplete && progress.hasPR ? 'var(--color-celebrate)' : 'var(--color-activity)'} stroke-width="2.5" stroke-linecap="round" fill="none" stroke-dasharray={ARC_C} stroke-dashoffset={ARC_C * (1 - progress.done / progress.total)} class="arc-fill" />
+								<svg class="day-arc" viewBox="0 0 52 32" fill="none">
+									<path d="M 4 28 A {ARC_R} {ARC_R} 0 0 1 48 28" stroke="var(--color-border)" stroke-width="3" stroke-linecap="round" fill="none" />
+									<path d="M 4 28 A {ARC_R} {ARC_R} 0 0 1 48 28" stroke={isComplete && progress.hasPR ? 'var(--color-celebrate)' : 'var(--color-activity)'} stroke-width="3" stroke-linecap="round" fill="none" stroke-dasharray={ARC_C} stroke-dashoffset={ARC_C * (1 - progress.done / progress.total)} class="arc-fill" />
 								</svg>
 								<span class="day-arc-label" class:complete={isComplete} class:has-pr={isComplete && progress.hasPR}>
-									{#if isComplete}&#10003;{:else}{progress.done}/{progress.total}{/if}
+									{#if isComplete}Done{:else}{progress.done}/{progress.total}{/if}
 								</span>
 							</div>
 						{/if}
@@ -639,9 +639,8 @@
 		display: flex;
 		align-items: center;
 		gap: 0.35rem;
-		font-size: 0.75rem;
-		color: var(--color-text-muted);
-		margin-bottom: 0.5rem;
+		font-size: var(--text-xs);
+		color: var(--color-text-secondary);
 	}
 
 	.dot-sep {
@@ -656,8 +655,8 @@
 
 	.day-arc-wrap {
 		position: relative;
-		width: 40px;
-		height: 24px;
+		width: 48px;
+		height: 28px;
 		flex-shrink: 0;
 	}
 
@@ -676,13 +675,18 @@
 		left: 50%;
 		transform: translateX(-50%);
 		font-family: var(--font-mono);
-		font-size: var(--text-2xs);
+		font-size: var(--text-xs);
 		color: var(--color-text-tertiary);
 		font-weight: var(--weight-bold);
 		white-space: nowrap;
 	}
 
 	.day-arc-label.complete {
+		font-family: var(--font-display);
+		font-size: var(--text-2xs);
+		font-weight: var(--weight-semibold);
+		letter-spacing: var(--tracking-wide);
+		text-transform: uppercase;
 		color: var(--color-activity);
 	}
 
