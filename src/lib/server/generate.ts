@@ -331,10 +331,11 @@ async function buildExerciseCatalog(equipment: string[]): Promise<Exercise[]> {
 
 export async function generatePlan(
 	supabase: SupabaseClient,
-	userId: string
+	userId: string,
+	timezone = 'UTC'
 ): Promise<{ planId: string } | { error: string }> {
 	// 1. Get generation context from Supabase
-	const context = await getGenerationContext(supabase, userId);
+	const context = await getGenerationContext(supabase, userId, timezone);
 	if (!context) {
 		return { error: 'Failed to load generation context.' };
 	}

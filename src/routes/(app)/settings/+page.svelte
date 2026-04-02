@@ -30,6 +30,7 @@
 	let injuries = $state<string[]>([]);
 	let equipment = $state<string[]>([]);
 	let unitPref = $state<'lb' | 'kg'>('lb');
+	let checkInDay = $state(6);
 	let newInjury = $state('');
 
 	// Pre-fill from settings
@@ -40,6 +41,7 @@
 		experienceLevel = settings.experience_level ?? '';
 		trainingDays = [...settings.training_days];
 		sessionDuration = settings.session_duration_minutes;
+		checkInDay = settings.check_in_day ?? 6;
 		injuries = [...settings.injuries];
 		equipment = settings.equipment.filter((e: string) => e !== 'body weight');
 		unitPref = settings.unit_pref;
@@ -164,6 +166,11 @@
 	function setSessionDuration(value: number) {
 		sessionDuration = value;
 		saveSettings({ session_duration_minutes: value });
+	}
+
+	function setCheckInDay(dayIndex: number) {
+		checkInDay = dayIndex;
+		saveSettings({ check_in_day: dayIndex });
 	}
 
 	function toggleTrainingDay(dayIndex: number) {
@@ -389,6 +396,20 @@
 				</button>
 			{/each}
 		</div>
+		<span class="sub-label">Check-in day</span>
+		<div class="day-picker">
+			{#each DAY_NAMES as name, i}
+				<button
+					type="button"
+					class="day-chip"
+					class:selected={checkInDay === i}
+					onclick={() => setCheckInDay(i)}
+				>
+					{name}
+				</button>
+			{/each}
+		</div>
+		<span class="sub-hint">Your weekly check-in triggers next week's plan generation</span>
 	</div>
 
 	<!-- Injuries (collapsible) -->
@@ -735,6 +756,12 @@
 		font-weight: var(--weight-medium);
 		color: var(--color-text-secondary);
 		margin-top: var(--space-2);
+	}
+
+	.sub-hint {
+		font-size: var(--text-2xs);
+		color: var(--color-text-tertiary);
+		margin-top: var(--space-1);
 	}
 
 	/* ═══ Field Groups ═══ */

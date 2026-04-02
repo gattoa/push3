@@ -24,7 +24,7 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase,
 	// Get user's unit preference
 	const { data: settings } = await supabase
 		.from('user_settings')
-		.select('unit_pref')
+		.select('unit_pref, check_in_day')
 		.eq('user_id', user.id)
 		.single();
 
@@ -96,7 +96,8 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase,
 	}
 
 	// ── Banner logic ──
-	const isCheckInDay = dayIndex === 6; // Sunday (dayIndex 6 = Sunday)
+	const checkInDay = settings?.check_in_day ?? 6;
+	const isCheckInDay = dayIndex === checkInDay;
 
 	const planCreatedAt = new Date(fullPlan.plan.created_at);
 	const hoursSinceGeneration = (Date.now() - planCreatedAt.getTime()) / (1000 * 60 * 60);
