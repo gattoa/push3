@@ -231,7 +231,13 @@
 		{#if editMode}
 			<p class="edit-hint">Tap a day, then tap another to swap</p>
 		{:else}
-			<h1 class="header-title">This Week</h1>
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<h1
+			class="header-title"
+			onclick={() => { invalidateAll(); }}
+			onkeydown={(e) => { if (e.key === 'Enter') invalidateAll(); }}
+			title="Refresh"
+		>This Week</h1>
 		{/if}
 	</header>
 
@@ -410,6 +416,13 @@
 		font-size: 1.25rem;
 		font-weight: 700;
 		text-align: center;
+		cursor: pointer;
+		-webkit-tap-highlight-color: transparent;
+		user-select: none;
+	}
+
+	.header-title:active {
+		opacity: 0.5;
 	}
 
 	/* ── Generation status card ── */
