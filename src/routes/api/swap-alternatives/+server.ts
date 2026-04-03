@@ -38,7 +38,8 @@ export const GET: RequestHandler = async ({ url, locals: { safeGetSession, supab
 			exercise_name: ex.name,
 			body_part: ex.bodyPart,
 			target: ex.target,
-			equipment: ex.equipment
+			equipment: ex.equipment,
+			gif_url: ex.gifUrl
 		}));
 
 		return json({ alternatives });

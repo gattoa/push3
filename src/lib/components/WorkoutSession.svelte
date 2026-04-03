@@ -695,8 +695,16 @@
 					{:else if getAlternatives(exercise)?.length}
 						{#each getAlternatives(exercise) ?? [] as alt}
 							<button class="swap-alt" onpointerdown={(e) => e.stopPropagation()} onclick={() => handleSwapSelect(exercise.id, alt)} disabled={swappingId === exercise.id}>
-								<span class="swap-alt-name">{alt.exercise_name}</span>
-								{#if alt.equipment}<span class="swap-alt-meta">{alt.equipment}</span>{/if}
+								{#if alt.gif_url}
+									<div class="swap-alt-gif">
+										<img src={alt.gif_url} alt="{alt.exercise_name}" loading="lazy" onload={(e) => (e.currentTarget as HTMLImageElement).classList.add('loaded')} />
+									</div>
+								{/if}
+								<div class="swap-alt-info">
+									<span class="swap-alt-name">{alt.exercise_name}</span>
+									{#if alt.target}<span class="swap-alt-target">{alt.target}</span>{/if}
+								</div>
+								{#if alt.equipment}<span class="swap-alt-equip">{alt.equipment}</span>{/if}
 							</button>
 						{/each}
 					{:else}
@@ -978,10 +986,15 @@
 	.flip-container.flipped .flip-front {
 		transform: rotateY(-180deg);
 		pointer-events: none;
+		visibility: hidden;
+		position: absolute;
+		inset: 0;
 	}
 
 	.flip-container.flipped .flip-back {
 		transform: rotateY(0deg);
+		position: relative;
+		inset: auto;
 	}
 
 	.flip-back-header {
@@ -1019,7 +1032,7 @@
 	.swap-alt {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
+		gap: var(--space-3);
 		width: 100%;
 		padding: var(--space-3) var(--space-4);
 		background: none;
@@ -1043,22 +1056,83 @@
 		background: var(--color-surface-active);
 	}
 
-	.swap-alt-name {
-		font-family: var(--font-display);
-		font-size: var(--text-sm);
-		font-weight: var(--weight-medium);
-		text-transform: capitalize;
-	}
-
-	.swap-alt-meta {
-		font-family: var(--font-mono);
-		font-size: var(--text-xs);
-		color: var(--color-text-tertiary);
-	}
-
 	.swap-alt:disabled {
 		opacity: 0.5;
 		pointer-events: none;
+	}
+
+	.swap-alt-gif {
+		width: 56px;
+		height: 56px;
+		border-radius: var(--radius-sm);
+		overflow: hidden;
+		flex-shrink: 0;
+		background: linear-gradient(
+			90deg,
+			var(--color-bg) 25%,
+			var(--color-surface-hover) 50%,
+			var(--color-bg) 75%
+		);
+		background-size: 200% 100%;
+		animation: shimmer 1.5s ease-in-out infinite;
+		border: 1px solid var(--color-border-subtle);
+	}
+
+	@keyframes shimmer {
+		0% { background-position: 200% 0; }
+		100% { background-position: -200% 0; }
+	}
+
+	.swap-alt-gif img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+		opacity: 0;
+		transition: opacity var(--duration-slow) var(--ease-out);
+	}
+
+	.swap-alt-gif img.loaded {
+		opacity: 1;
+	}
+
+	.swap-alt-info {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-1);
+	}
+
+	.swap-alt-name {
+		font-family: var(--font-display);
+		font-size: var(--text-sm);
+		font-weight: var(--weight-semibold);
+		text-transform: capitalize;
+		line-height: var(--leading-tight);
+	}
+
+	.swap-alt-target {
+		font-family: var(--font-body);
+		font-size: var(--text-xs);
+		color: var(--color-text-secondary);
+		text-transform: capitalize;
+		line-height: var(--leading-normal);
+	}
+
+	.swap-alt-equip {
+		flex-shrink: 0;
+		align-self: center;
+		font-family: var(--font-mono);
+		font-size: var(--text-2xs);
+		font-weight: var(--weight-medium);
+		color: var(--color-text-secondary);
+		text-transform: capitalize;
+		background: var(--color-bg);
+		border: 1px solid var(--color-border);
+		padding: var(--space-0-5) var(--space-2);
+		border-radius: var(--radius-xs);
+		white-space: nowrap;
 	}
 
 	.swap-loading,

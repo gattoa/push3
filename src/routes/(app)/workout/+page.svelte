@@ -6,6 +6,7 @@
 	import { Eye } from 'lucide-svelte';
 	import { shouldShowBanner, dismissBanner } from '$lib/utils/banner';
 	import { navigating } from '$app/stores';
+	import { onMount } from 'svelte';
 	import type { FullPlanDay } from '$lib/types/database';
 	import { getTodayDisplay } from '$lib/utils/date';
 
@@ -24,6 +25,22 @@
 	let isClientNav = $state(false);
 	$effect(() => {
 		if ($navigating) isClientNav = true;
+	});
+
+	// Preload alternative gif thumbnails so they're cached when the user flips a card
+	onMount(() => {
+		const urls: string[] = [];
+		for (const exercise of day.exercises) {
+			if (exercise.alternatives) {
+				for (const alt of exercise.alternatives) {
+					if (alt.gif_url) urls.push(alt.gif_url);
+				}
+			}
+		}
+		for (const url of urls) {
+			const img = new Image();
+			img.src = url;
+		}
 	});
 
 	// Banner (localStorage-backed persistence)
