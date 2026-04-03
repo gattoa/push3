@@ -47,6 +47,7 @@ export interface ExerciseAlternative {
 	body_part: string;
 	target: string;
 	equipment: string;
+	gif_url?: string;
 }
 
 export interface PlannedExercise {

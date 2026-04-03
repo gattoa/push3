@@ -199,7 +199,8 @@ Call the set_alternatives tool once with all exercises.`;
 
 		const result = toolBlock.input as AlternativesResult;
 
-		// 6. Persist to database
+		// 6. Persist to database (enrich with gif URLs from catalog)
+		const gifLookup = buildGifLookup(candidateCatalog);
 		let successCount = 0;
 		for (const item of result.exercises) {
 			const alternatives: ExerciseAlternative[] = item.alternatives.slice(0, 3).map((a) => ({
@@ -207,7 +208,8 @@ Call the set_alternatives tool once with all exercises.`;
 				exercise_name: a.exercise_name,
 				body_part: a.body_part,
 				target: a.target,
-				equipment: a.equipment
+				equipment: a.equipment,
+				gif_url: gifLookup.get(a.exercise_id)
 			}));
 
 			const { error } = await supabase
@@ -231,6 +233,17 @@ Call the set_alternatives tool once with all exercises.`;
 // ============================================================================
 // Helpers
 // ============================================================================
+
+/**
+ * Build a lookup map from exercise ID to gifUrl using the candidate catalog.
+ */
+function buildGifLookup(catalog: Exercise[]): Map<string, string> {
+	const map = new Map<string, string>();
+	for (const ex of catalog) {
+		if (ex.gifUrl) map.set(ex.id, ex.gifUrl);
+	}
+	return map;
+}
 
 /**
  * Build a candidate exercise catalog from user's equipment.
