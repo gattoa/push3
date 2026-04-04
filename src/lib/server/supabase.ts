@@ -296,36 +296,13 @@ export async function swapExercise(
 		return { success: false, error: exerciseQueryError?.message ?? 'Exercise not found' };
 	}
 
-	// Build rotated alternatives: current exercise replaces the picked one.
+	// Rotate alternatives: remove the picked exercise, keep everything else.
+	// The array is [self, alt1, alt2, alt3] where self has full metadata.
+	// After swap A→B: self=A stays, B is removed, result is [A, C, D].
+	// The UI filters out the entry matching the current exercise_id,
+	// so after swap the user sees [A, C, D] minus B (now current) = [A, C, D].
 	const currentAlternatives = (currentExercise.alternatives as ExerciseAlternative[] | null) ?? [];
-	const remaining = currentAlternatives.filter((a) => a.exercise_id !== newExerciseId);
-
-	// Current exercise becomes an alternative — enrich with full metadata from ExerciseDB
-	let currentAsAlt: ExerciseAlternative = {
-		exercise_id: currentExercise.exercise_id,
-		exercise_name: currentExercise.exercise_name,
-		body_part: '',
-		target: '',
-		equipment: '',
-		gif_url: undefined
-	};
-
-	try {
-		const { getExerciseById } = await import('$lib/server/exercisedb');
-		const exData = await getExerciseById(currentExercise.exercise_id);
-		currentAsAlt = {
-			exercise_id: currentExercise.exercise_id,
-			exercise_name: currentExercise.exercise_name,
-			body_part: exData.bodyPart,
-			target: exData.target,
-			equipment: exData.equipment,
-			gif_url: exData.gifUrl
-		};
-	} catch (e) {
-		console.warn('[swap] Could not enrich exercise metadata:', e);
-	}
-
-	const rotatedAlternatives: ExerciseAlternative[] = [currentAsAlt, ...remaining].slice(0, 3);
+	const rotatedAlternatives = currentAlternatives.filter((a) => a.exercise_id !== newExerciseId);
 
 	// 2. Read existing planned_sets (preserve rep scheme for the new exercise)
 	const { data: sets, error: setsQueryError } = await supabase

@@ -320,9 +320,12 @@
 	let swappingId = $state<string | null>(null);
 
 	function getAlternatives(exercise: FullPlanExercise): ExerciseAlternative[] | null {
-		if (exercise.alternatives && exercise.alternatives.length > 0) return exercise.alternatives;
-		if (alternativesCache[exercise.id]) return alternativesCache[exercise.id];
-		return null;
+		const raw = exercise.alternatives && exercise.alternatives.length > 0
+			? exercise.alternatives
+			: alternativesCache[exercise.id] ?? null;
+		if (!raw) return null;
+		// Filter out the exercise itself (stored at index 0 for rotation)
+		return raw.filter((a) => a.exercise_id !== exercise.exercise_id);
 	}
 
 	async function fetchFallbackAlternatives(exercise: FullPlanExercise) {

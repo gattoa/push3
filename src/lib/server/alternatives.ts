@@ -214,10 +214,25 @@ Call the set_alternatives tool once with all exercises.`;
 		}
 
 		// 6. Persist to database (enrich with gif URLs from catalog)
+		// Build lookups for enrichment
 		const gifLookup = buildGifLookup(candidateCatalog);
+		const catalogLookup = new Map(candidateCatalog.map((e) => [e.id, e]));
+
 		let successCount = 0;
 		for (const item of result.exercises) {
-			const alternatives: ExerciseAlternative[] = item.alternatives.slice(0, 3).map((a) => ({
+			// Find the planned exercise's own metadata so rotation has it pre-cached
+			const plannedEx = dayGroups.flatMap((d) => d.exercises).find((e) => e.id === item.planned_exercise_id);
+			const selfData = plannedEx ? catalogLookup.get(plannedEx.exercise_id) : null;
+			const selfEntry: ExerciseAlternative | null = selfData ? {
+				exercise_id: selfData.id,
+				exercise_name: selfData.name,
+				body_part: selfData.bodyPart,
+				target: selfData.target,
+				equipment: selfData.equipment,
+				gif_url: selfData.gifUrl
+			} : null;
+
+			const aiAlternatives: ExerciseAlternative[] = item.alternatives.slice(0, 3).map((a) => ({
 				exercise_id: a.exercise_id,
 				exercise_name: a.exercise_name,
 				body_part: a.body_part,
@@ -225,6 +240,10 @@ Call the set_alternatives tool once with all exercises.`;
 				equipment: a.equipment,
 				gif_url: gifLookup.get(a.exercise_id)
 			}));
+
+			// Store as [self, alt1, alt2, alt3] — self entry at index 0
+			// UI shows only items where exercise_id !== current exercise_id
+			const alternatives = selfEntry ? [selfEntry, ...aiAlternatives] : aiAlternatives;
 
 			const { error } = await supabase
 				.from('planned_exercises')
