@@ -143,6 +143,12 @@ These are system constraints that must be followed exactly.
 6. Do NOT repeat the same exercise across multiple training days in the same week.
 7. For each exercise, provide a brief rationale explaining why it was chosen for this athlete.
 8. Include a warm-up note on the first exercise of each training day.
+9. Respect the athlete's session duration. The total workout (including warm-up, all exercises, rest between sets, and any cardio) must fit within the specified time. Use these guidelines:
+   - 30 min: 3-4 exercises, minimal rest, no cardio finisher
+   - 45 min: 4-5 exercises, moderate structure
+   - 60 min: 5-6 exercises, full session structure
+   - 75-90 min: 6-7 exercises, room for cardio finishers and thorough warm-up
+   Fewer exercises with proper volume is better than cramming too many into a short session.
 
 ## Coaching Guidelines
 These inform your programming decisions. Adapt them based on the athlete's inputs.
@@ -196,7 +202,6 @@ These inform your programming decisions. Adapt them based on the athlete's input
 
 ### Respect Constraints
 - Avoid exercises that load injured areas.
-- Respect session duration — don't overprescribe for a 30-minute session.
 
 ## Output
 Call the generate_weekly_plan tool exactly once with the complete plan.`;
