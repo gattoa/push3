@@ -12,6 +12,7 @@ import { ANTHROPIC_API_KEY } from '$env/static/private';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ExerciseAlternative } from '$lib/types/database';
 import { getExercisesByEquipment } from '$lib/server/exercisedb';
+import { mapEquipmentToDb } from '$lib/server/equipment';
 import type { Exercise } from '$lib/types/exercise';
 
 // ============================================================================
@@ -131,7 +132,7 @@ export async function computeAlternativesForPlan(
 	}
 
 	// 3. Build candidate catalog from user's equipment
-	const equipment = [...new Set([...(settings.equipment ?? []), 'body weight'])];
+	const equipment = mapEquipmentToDb(settings.equipment ?? []);
 	const candidateCatalog = await buildCandidateCatalog(equipment);
 	console.log(`[alternatives] Candidate catalog: ${candidateCatalog.length} exercises`);
 

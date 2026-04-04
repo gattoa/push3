@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import type { ExerciseAlternative } from '$lib/types/database';
 import { getExerciseById, getExercisesByMuscle } from '$lib/server/exercisedb';
+import { mapEquipmentToDb } from '$lib/server/equipment';
 
 export const GET: RequestHandler = async ({ url, locals: { safeGetSession, supabase } }) => {
 	const { user } = await safeGetSession();
@@ -19,7 +20,7 @@ export const GET: RequestHandler = async ({ url, locals: { safeGetSession, supab
 		.eq('user_id', user.id)
 		.single();
 
-	const equipmentSet = new Set([...(settings?.equipment ?? []), 'body weight']);
+	const equipmentSet = new Set(mapEquipmentToDb(settings?.equipment ?? []));
 
 	try {
 		// Fetch current exercise to get its target muscle

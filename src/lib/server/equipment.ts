@@ -13,7 +13,8 @@ export { EQUIPMENT_OPTIONS, EQUIPMENT_GROUPS };
 export const EQUIPMENT_EXPANSIONS: Record<string, string[]> = {
 	'bench': [],              // bench exercises are covered by barbell/dumbbell
 	'squat rack': ['barbell'], // squat rack implies barbell access
-	'pull-up bar': []          // pull-up exercises are covered by 'body weight'
+	'pull-up bar': [],         // pull-up exercises are covered by 'body weight'
+	'machine': ['leverage machine', 'sled machine']  // ExerciseDB splits machines into subtypes
 };
 
 /**
