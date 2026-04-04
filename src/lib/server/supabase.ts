@@ -16,7 +16,8 @@ import type {
 	PlannedSetInsert,
 	SetLogInsert,
 	SetLogUpdate,
-	CheckInInsert
+	CheckInInsert,
+	ExerciseAlternative
 } from '$lib/types/database';
 
 // ============================================================================
@@ -283,8 +284,48 @@ export async function swapExercise(
 	newExerciseName: string,
 	userId: string
 ): Promise<{ success: true } | { success: false; error: string }> {
-	// Alternatives are cleared on swap — the fallback endpoint fetches
-	// fresh ones for the new exercise's muscle group on next swipe
+	// 1. Read current exercise to build rotated alternatives
+	const { data: currentExercise, error: exerciseQueryError } = await supabase
+		.from('planned_exercises')
+		.select('exercise_id, exercise_name, alternatives')
+		.eq('id', plannedExerciseId)
+		.single();
+
+	if (exerciseQueryError || !currentExercise) {
+		console.error('Failed to query planned exercise:', exerciseQueryError?.message);
+		return { success: false, error: exerciseQueryError?.message ?? 'Exercise not found' };
+	}
+
+	// Build rotated alternatives: current exercise replaces the picked one.
+	const currentAlternatives = (currentExercise.alternatives as ExerciseAlternative[] | null) ?? [];
+	const remaining = currentAlternatives.filter((a) => a.exercise_id !== newExerciseId);
+
+	// Current exercise becomes an alternative — enrich with full metadata from ExerciseDB
+	let currentAsAlt: ExerciseAlternative = {
+		exercise_id: currentExercise.exercise_id,
+		exercise_name: currentExercise.exercise_name,
+		body_part: '',
+		target: '',
+		equipment: '',
+		gif_url: undefined
+	};
+
+	try {
+		const { getExerciseById } = await import('$lib/server/exercisedb');
+		const exData = await getExerciseById(currentExercise.exercise_id);
+		currentAsAlt = {
+			exercise_id: currentExercise.exercise_id,
+			exercise_name: currentExercise.exercise_name,
+			body_part: exData.bodyPart,
+			target: exData.target,
+			equipment: exData.equipment,
+			gif_url: exData.gifUrl
+		};
+	} catch (e) {
+		console.warn('[swap] Could not enrich exercise metadata:', e);
+	}
+
+	const rotatedAlternatives: ExerciseAlternative[] = [currentAsAlt, ...remaining].slice(0, 3);
 
 	// 2. Read existing planned_sets (preserve rep scheme for the new exercise)
 	const { data: sets, error: setsQueryError } = await supabase
@@ -336,7 +377,7 @@ export async function swapExercise(
 			exercise_name: newExerciseName,
 			notes: null,
 			rationale: null,
-			alternatives: null
+			alternatives: rotatedAlternatives
 		})
 		.eq('id', plannedExerciseId);
 

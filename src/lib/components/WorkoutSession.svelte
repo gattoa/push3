@@ -364,7 +364,7 @@
 			} else {
 				const { error } = await res.json();
 				console.error('[swap] Failed:', error);
-				addToast('Swap failed — try again', 'error');
+				addToast('Swap failed \u2014 try again', 'error');
 			}
 		} finally {
 			swappingId = null;
