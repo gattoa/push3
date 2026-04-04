@@ -13,50 +13,56 @@ Both lead to the same outcome: **work happens off-app, progress goes unrecorded.
 The tracking gap is a **symptom of weak generation**, not a missing UI feature.
 
 ### Generation issues (primary)
-- **Equipment bias**: No guidance in the system prompt to distribute exercises across equipment types. ExerciseDB catalogs skew barbell-heavy, so Claude picks more barbell movements.
-- **No core work**: The prompt says "4-6 exercises per training day" with rules entirely focused on compound lifts and isolation work. A real personal trainer would include 1-2 core exercises.
-- **No cardio/conditioning**: The prompt doesn't mention cardio finishers, LISS, or conditioning work at all. For goals like `lose_fat` or `general_fitness`, this is a significant gap.
+- **Equipment bias**: The user-facing "machine" equipment option mapped to nothing in ExerciseDB (0 exercises). Users who selected machine got zero machine exercises in plans or alternatives.
+- **No core work**: The prompt was entirely focused on compound lifts and isolation work. A real trainer always includes core.
+- **No cardio/conditioning**: No mention of cardio in the prompt. For fat loss or general fitness goals, this is a significant gap.
+- **Rigid rules**: The prompt was 19 numbered rules, not coaching guidelines. It didn't encourage the AI to adapt based on the athlete's actual data.
 
-### Alternatives issues (secondary)
-- The alternatives prompt says "vary equipment across the 3 picks **where possible**" — soft guidance that Claude can ignore.
-- The candidate catalog (`buildCandidateCatalog`) fetches 50 exercises per equipment type, which should provide variety, but Claude isn't being told strongly enough to use it.
+### Swap issues (secondary)
+- **Stale alternatives after swap**: The rotation logic was creating entries with empty metadata (no body_part, target, equipment, gif_url). Each swap degraded the data further.
+- **Shrinking pool**: The alternatives array shrunk on each swap, eventually leaving the user with 0-1 options.
+- **Same-equipment alternatives**: The prompt allowed same-equipment suggestions (barbell alternatives for barbell exercises).
 
-### When it happens
-- Mid-workout, between exercises. The user is deciding what to do next and the options don't match their preference.
+### Other bugs found
+- GIF thumbnails on swap cards weren't rendering due to CSS opacity transition + backface-visibility compositing conflict in WebKit.
 
-## Solution: Fix Generation First
+## What We Fixed
 
-### Phase 1: Plan generation improvements
+### Equipment mapping bug
+- `"machine"` → `["leverage machine", "sled machine"]` — 109 exercises now available
+- Applied the mapping consistently across plan generation, AI alternatives, and fallback swap alternatives
 
-**System prompt changes (`generate.ts`):**
+### Swap rotation
+- Alternatives stored as fixed group of 4: `[self, B, C, D]` with full metadata (body_part, target, equipment, gif_url)
+- Self-entry metadata pre-cached at generation time — zero network calls during swaps
+- Array never shrinks — UI filters out the current exercise, always showing exactly 3 options
+- Users can swap back to any previous exercise (corrects accidental taps)
 
-1. **Equipment distribution rule**: Add explicit instruction to vary equipment across the week. If the athlete has barbell, dumbbell, cable, and machine access, the plan should use all of them — not lean heavily on one type.
+### GIF thumbnails
+- Removed opacity transition that conflicted with 3D flip card transforms
 
-2. **Core work rule**: Add instruction to include 1-2 core exercises per training day (or at minimum on 2-3 days per week). Real trainers program core — the AI should too.
+### Generation prompt rewrite
+- Split into **Structural Requirements** (system constraints) and **Coaching Guidelines** (informed by athlete data)
+- Added core work guidance (1-2 exercises on most training days)
+- Added goal-dependent cardio (required for lose_fat, optional for hypertrophy)
+- Added equipment variety guidance (use the athlete's full range of equipment)
+- Reads as instructions to a real trainer, not a rigid rulebook
 
-3. **Cardio/conditioning rule**: Goal-dependent:
-   - `lose_fat`: Include a cardio finisher (10-15 min) on each training day
-   - `general_fitness`: Include cardio 2-3x per week
-   - `build_muscle` / `build_strength`: Optional, light cardio on rest days or as warmup
-   
-4. **Catalog balance**: The `trimCatalog` function already balances across body parts (5+ per group up to 80 total). Consider also balancing across equipment types so Claude has diverse options.
+### Alternatives prompt
+- Hard constraint: alternatives must use different equipment than the prescribed exercise
 
-### Phase 2: Alternatives improvements
+## Deferred
 
-**Alternatives prompt changes (`alternatives.ts`):**
+### Manual overrides (future, if needed)
+If generation + alternatives improvements resolve most cases, manual overrides become low-priority. The two features that would matter:
+- **"Add exercise" to a workout** — for genuinely unplanned work
+- **"Search for more" on swap card** — single text link below the 3 AI picks
 
-1. Change rule #3 from "Use varied equipment across the 3 picks **where possible**" to a hard constraint: "Each of the 3 alternatives MUST use a different equipment type than the prescribed exercise. At least one should use a different equipment category (e.g., if prescribed is barbell, include a cable or machine option)."
+Both deferred until we validate whether the generation fixes solve the problem.
 
-2. Add the prescribed exercise's equipment to the prompt context so Claude knows what to diversify away from.
-
-### Phase 3: Manual overrides (future, deferred)
-
-If generation + alternatives improvements resolve most cases, manual overrides become a low-priority edge case feature. The two features that would matter:
-
-- **"Add exercise" to a workout** — for genuinely unplanned work. Simple button at bottom of exercise list, opens a quick-add flow.
-- **"Search for more" on swap card** — single text link below the 3 AI picks, opens search. Only needed if 3 alternatives still miss after Phase 2.
-
-Both deferred until we validate whether Phase 1 + 2 solve the problem.
+### Other future considerations
+- Stretch/mobility programming (the ExerciseDB "assisted" category is mostly partner stretches — potentially useful for seniors or recovery-focused goals)
+- `invalidateAll()` performance optimization after swaps
 
 ## Decision Log
 
@@ -65,3 +71,6 @@ Both deferred until we validate whether Phase 1 + 2 solve the problem.
 | 2026-04-04 | Scope down from full override UI to generation fixes | The tracking gap is a symptom of bad recommendations, not missing UI. Fix upstream. |
 | 2026-04-04 | Defer "Add Exercise" and search-in-swap | Can't justify UI complexity until we validate that better generation doesn't solve it. |
 | 2026-04-04 | Cardio/core belong in plan generation | Users do this work — it should be prescribed and tracked like any other exercise. |
+| 2026-04-04 | Fixed equipment mapping as highest priority | "machine" → 0 exercises was a data bug affecting every plan and every alternative for machine users. |
+| 2026-04-04 | Alternatives are a fixed group of 4 | Enables infinite swaps within the group. User always sees 3 options. Can always swap back. |
+| 2026-04-04 | Rewrite prompt as coaching guidelines, not rules | The AI should adapt to the athlete's data, not follow rigid prescriptions. User inputs from onboarding, logging, and check-ins are the drivers. |
