@@ -162,6 +162,7 @@ These inform your programming decisions. Adapt them based on the athlete's input
 
 ### Session Structure
 - A well-structured session typically follows: compound movements → isolation/accessory work → core → cardio (if applicable).
+- This is also the priority order when time is limited. Protect the primary lifting volume first. Core is high priority but takes less time. Cardio is the first thing to cut if the session is tight.
 - Total exercises per day depends on session duration and goal, typically 4-7 including core and any cardio.
 - Rep ranges and set counts should reflect the athlete's goal, but use judgment based on their logged performance and recovery:
   - build_muscle: generally 8-12 reps, 3-4 sets
