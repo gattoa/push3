@@ -296,13 +296,11 @@ export async function swapExercise(
 		return { success: false, error: exerciseQueryError?.message ?? 'Exercise not found' };
 	}
 
-	// Rotate alternatives: remove the picked exercise, keep everything else.
-	// The array is [self, alt1, alt2, alt3] where self has full metadata.
-	// After swap A→B: self=A stays, B is removed, result is [A, C, D].
-	// The UI filters out the entry matching the current exercise_id,
-	// so after swap the user sees [A, C, D] minus B (now current) = [A, C, D].
-	const currentAlternatives = (currentExercise.alternatives as ExerciseAlternative[] | null) ?? [];
-	const rotatedAlternatives = currentAlternatives.filter((a) => a.exercise_id !== newExerciseId);
+	// Alternatives are a fixed group of 4 exercises [A, B, C, D].
+	// The array never changes — the UI filters out whichever is currently active.
+	// Swap A→B: array stays [A, B, C, D], UI shows [A, C, D].
+	// Swap B→C: array stays [A, B, C, D], UI shows [A, B, D].
+	const rotatedAlternatives = (currentExercise.alternatives as ExerciseAlternative[] | null) ?? [];
 
 	// 2. Read existing planned_sets (preserve rep scheme for the new exercise)
 	const { data: sets, error: setsQueryError } = await supabase
