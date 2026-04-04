@@ -166,7 +166,7 @@ export async function computeAlternativesForPlan(
 
 1. Serve the same programming purpose — match the movement pattern (press for press, hinge for hinge, pull for pull), not just the target muscle
 2. Are appropriate for a ${settings.experience_level} athlete with a ${settings.goals} goal
-3. Use varied equipment across the 3 picks where possible (e.g., barbell, dumbbell, cable)
+3. Each of the 3 alternatives MUST use a different equipment type than the prescribed exercise. For example, if the prescribed exercise uses a barbell, do NOT suggest another barbell exercise — pick from dumbbell, cable, machine, etc. Across the 3 picks, use at least 2 different equipment types
 4. Do NOT include any exercise already prescribed on the same training day
 5. Do NOT include the exercise itself as an alternative
 6. Every alternative must come from the candidate catalog below

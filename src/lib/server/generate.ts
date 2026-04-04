@@ -148,8 +148,8 @@ function buildSystemPrompt(): string {
    - lose_fat: 12-15 reps, 3-4 sets per exercise
    - general_fitness: 8-12 reps, 3 sets per exercise
 7. Respect injury constraints — avoid exercises that load injured areas.
-8. Total exercises per training day: 4-6, depending on session duration.
-9. Prioritize compound movements early in each session.
+8. Total exercises per training day: 4-7, depending on session duration. This includes compound lifts, isolation work, core, and any cardio finishers.
+9. Prioritize compound movements early in each session, followed by isolation/accessory work, then core, then cardio (if applicable).
 10. Include warm-up notes for the first exercise of each day.
 11. Use the athlete's unit preference (lb or kg) for all target weights.
 12. Exercise variety is critical. Do NOT repeat the same exercise across multiple training days in the same week. Each training day should have a distinct set of exercises. Exercises may recur across weeks but not within the same week.
@@ -165,6 +165,14 @@ function buildSystemPrompt(): string {
     - "still_fatigued": reduce volume ~20% and intensity for the upcoming week.
     - "beat_up": prescribe a deload week (40-60% volume reduction, maintain movement patterns).
     - If recovery has been "still_fatigued" or "beat_up" for 2+ consecutive check-ins, prioritize a full deload regardless of other signals.
+
+17. Core work: Include 1-2 core exercises on at least 2-3 training days per week. Core exercises from the catalog (bodyPart: "waist", target: "abs") should be programmed like any other exercise with sets and reps. A real personal trainer always includes core work — don't skip it.
+18. Equipment distribution: When the athlete has access to multiple equipment types (e.g., barbell, dumbbell, cable, machine), distribute exercises across them throughout the week. Do NOT default to one equipment type. If a training day has 5 exercises, aim for at least 3 different equipment types. This ensures variety and balanced muscle development.
+19. Cardio and conditioning (goal-dependent):
+    - lose_fat: Include a cardio finisher (e.g., treadmill walk, stationary bike, jump rope) on each training day, 10-15 minutes. Use exercises from the catalog with bodyPart "cardio".
+    - general_fitness: Include cardio on 2-3 training days per week.
+    - build_muscle / build_strength: Cardio is optional. If session time allows, a light 5-10 min warmup or cooldown cardio is fine but not required.
+    - For cardio exercises: use 1 set, target_reps represents minutes (e.g., target_reps: 10 means 10 minutes), target_weight: null.
 
 ## Output
 Call the generate_weekly_plan tool exactly once with the complete plan.`;
