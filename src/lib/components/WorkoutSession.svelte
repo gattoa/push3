@@ -1088,12 +1088,6 @@
 		height: 100%;
 		object-fit: cover;
 		display: block;
-		opacity: 0;
-		transition: opacity var(--duration-slow) var(--ease-out);
-	}
-
-	.swap-alt-gif img.loaded {
-		opacity: 1;
 	}
 
 	.swap-alt-info {
