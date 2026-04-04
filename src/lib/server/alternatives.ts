@@ -134,7 +134,13 @@ export async function computeAlternativesForPlan(
 	// 3. Build candidate catalog from user's equipment
 	const equipment = mapEquipmentToDb(settings.equipment ?? []);
 	const candidateCatalog = await buildCandidateCatalog(equipment);
+	// Log equipment breakdown for debugging
+	const eqBreakdown: Record<string, number> = {};
+	for (const ex of candidateCatalog) {
+		eqBreakdown[ex.equipment] = (eqBreakdown[ex.equipment] ?? 0) + 1;
+	}
 	console.log(`[alternatives] Candidate catalog: ${candidateCatalog.length} exercises`);
+	console.log(`[alternatives] Equipment breakdown:`, eqBreakdown);
 
 	if (candidateCatalog.length === 0) {
 		console.warn('[alternatives] Empty candidate catalog — skipping');
@@ -199,6 +205,13 @@ Call the set_alternatives tool once with all exercises.`;
 		}
 
 		const result = toolBlock.input as AlternativesResult;
+
+		// Log what Claude picked
+		for (const item of result.exercises) {
+			const exName = dayGroups.flatMap(d => d.exercises).find(e => e.id === item.planned_exercise_id)?.exercise_name ?? item.planned_exercise_id;
+			const altSummary = item.alternatives.map(a => `${a.exercise_name} (${a.equipment})`).join(', ');
+			console.log(`[alternatives] ${exName} → ${altSummary}`);
+		}
 
 		// 6. Persist to database (enrich with gif URLs from catalog)
 		const gifLookup = buildGifLookup(candidateCatalog);
