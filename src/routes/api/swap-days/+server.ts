@@ -45,15 +45,20 @@ export const POST: RequestHandler = async ({ request, locals: { safeGetSession, 
 		return json({ error: 'Days must belong to the same plan' }, { status: 400 });
 	}
 
-	// Verify plan ownership
+	// Verify plan ownership and status
 	const { data: plan, error: planError } = await supabase
 		.from('weekly_plans')
-		.select('user_id')
+		.select('user_id, status')
 		.eq('id', dayA.plan_id)
 		.single();
 
 	if (planError || !plan || plan.user_id !== user.id) {
 		return json({ error: 'Forbidden' }, { status: 403 });
+	}
+
+	// Block modifications to completed plans — the week is closed
+	if (plan.status === 'completed') {
+		return json({ error: 'Cannot modify a completed plan' }, { status: 409 });
 	}
 
 	// 1. Swap split_label values

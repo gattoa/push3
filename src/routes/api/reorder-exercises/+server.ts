@@ -37,12 +37,17 @@ export const PATCH: RequestHandler = async ({ request, locals: { safeGetSession,
 
 	const { data: plan, error: planError } = await supabase
 		.from('weekly_plans')
-		.select('user_id')
+		.select('user_id, status')
 		.eq('id', dayRow.plan_id)
 		.single();
 
 	if (planError || !plan || plan.user_id !== user.id) {
 		return json({ error: 'Forbidden' }, { status: 403 });
+	}
+
+	// Block modifications to completed plans — the week is closed
+	if (plan.status === 'completed') {
+		return json({ error: 'Cannot modify a completed plan' }, { status: 409 });
 	}
 
 	// Batch update order indices

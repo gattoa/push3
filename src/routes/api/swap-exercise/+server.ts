@@ -13,10 +13,10 @@ export const POST: RequestHandler = async ({ request, locals: { safeGetSession, 
 		return json({ error: 'Missing required fields' }, { status: 400 });
 	}
 
-	// Verify ownership: planned_exercise → planned_day → weekly_plan → user_id
+	// Verify ownership and plan status: planned_exercise → planned_day → weekly_plan
 	const { data: exercise, error: lookupError } = await supabase
 		.from('planned_exercises')
-		.select('id, planned_days!inner(weekly_plans!inner(user_id))')
+		.select('id, planned_days!inner(weekly_plans!inner(user_id, status))')
 		.eq('id', planned_exercise_id)
 		.maybeSingle();
 
@@ -30,9 +30,14 @@ export const POST: RequestHandler = async ({ request, locals: { safeGetSession, 
 	}
 
 	// RLS enforces ownership, but check explicitly for a clear 403
-	const plan = exercise.planned_days as unknown as { weekly_plans: { user_id: string } };
+	const plan = exercise.planned_days as unknown as { weekly_plans: { user_id: string; status: string } };
 	if (plan.weekly_plans.user_id !== user.id) {
 		return json({ error: 'Forbidden' }, { status: 403 });
+	}
+
+	// Block modifications to completed plans — the week is closed
+	if (plan.weekly_plans.status === 'completed') {
+		return json({ error: 'Cannot modify a completed plan' }, { status: 409 });
 	}
 
 	const result = await swapExercise(supabase, planned_exercise_id, new_exercise_id, new_exercise_name, user.id);

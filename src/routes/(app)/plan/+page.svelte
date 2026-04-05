@@ -12,7 +12,7 @@
 	let { data } = $props();
 	const plan = $derived(data.fullPlan as FullPlan | null);
 	const todayIndex = $derived(data.todayIndex as number);
-	const hasPreviousPlan = $derived(data.hasPreviousPlan as boolean);
+	const needsCheckIn = $derived(data.needsCheckIn as boolean);
 	const serverGenStatus = $derived(data.generationStatus as 'none' | 'generating' | 'ready');
 	const trainingDays = $derived(data.trainingDays as number[]);
 
@@ -27,7 +27,10 @@
 
 	const isGenerating = $derived(genState === 'generating');
 
-	// On mount: if server says generating or no plan exists (and no previous plan to check-in from), start generation
+	// On mount: auto-trigger generation if the user needs a new plan.
+	// Two cases auto-generate: new user (no plans at all) or returning user
+	// whose most recent plan is completed (check-in submitted).
+	// Users with an active plan from a previous week must check in first.
 	$effect(() => {
 		if (plan) {
 			// Plan exists — nothing to do
@@ -39,8 +42,9 @@
 			// Plan is already being generated server-side — just poll
 			genState = 'generating';
 			startPolling();
-		} else if (serverGenStatus === 'none' && !hasPreviousPlan) {
-			// First-time user with no plan — trigger generation
+		} else if (serverGenStatus === 'none' && !needsCheckIn) {
+			// No plan and no pending check-in — generate
+			// (covers new users AND returning users who just checked in)
 			triggerGeneration();
 		}
 	});
@@ -373,7 +377,7 @@
 		</div>
 		<PlanSkeleton {trainingDays} />
 
-	{:else if hasPreviousPlan}
+	{:else if needsCheckIn}
 		<!-- ═══ Returning user: needs check-in before new plan ═══ -->
 		<div class="empty-state">
 			<div class="empty-icon">

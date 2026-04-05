@@ -17,11 +17,11 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase,
 
 	// If no active plan, check if one is currently generating
 	let generationStatus: 'none' | 'generating' | 'ready' = fullPlan ? 'ready' : 'none';
-	let hasPreviousPlan = false;
+	let needsCheckIn = false;
 	let trainingDays: number[] = [];
 
 	if (!fullPlan) {
-		// Check for a plan that's currently being generated
+		// Check for a plan that's currently being generated for this week
 		const { data: generatingPlan } = await supabase
 			.from('weekly_plans')
 			.select('id, status')
@@ -35,15 +35,21 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase,
 			generationStatus = 'generating';
 		}
 
-		// Check for any previous completed plan
-		const { data: anyPlan } = await supabase
+		// Look at the most recent plan (any status) to determine next action.
+		//
+		// - No plan at all → new user → auto-generate
+		// - Most recent is 'completed' → user checked in → auto-generate this week's plan
+		// - Most recent is 'active' → calendar rolled over without check-in → show Check In CTA
+		// - Most recent is 'generating' → handled above (generationStatus = 'generating')
+		const { data: mostRecentPlan } = await supabase
 			.from('weekly_plans')
-			.select('id')
+			.select('status')
 			.eq('user_id', user.id)
-			.in('status', ['active', 'completed'])
+			.order('week_start_date', { ascending: false })
 			.limit(1)
 			.maybeSingle();
-		hasPreviousPlan = !!anyPlan;
+
+		needsCheckIn = mostRecentPlan?.status === 'active';
 	}
 
 	// Fetch training days for skeleton display
@@ -55,5 +61,5 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase,
 
 	trainingDays = settings?.training_days ?? [];
 
-	return { fullPlan, todayIndex, hasPreviousPlan, generationStatus, trainingDays };
+	return { fullPlan, todayIndex, needsCheckIn, generationStatus, trainingDays };
 };
