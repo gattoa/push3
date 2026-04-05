@@ -377,17 +377,25 @@ export async function generatePlan(
 		return { error: 'Failed to load generation context.' };
 	}
 
-	// 2. Check for existing plan for this calendar week
+	// 2. If a plan already exists for the target week (any status, including completed),
+	//    advance to next Monday. This handles mid-week check-ins where the user
+	//    checks in before the calendar rolls over.
 	const { data: existingPlan } = await supabase
 		.from('weekly_plans')
-		.select('id')
+		.select('id, status')
 		.eq('user_id', userId)
 		.eq('week_start_date', context.next_week_start_date)
-		.in('status', ['generating', 'active'])
 		.maybeSingle();
 
 	if (existingPlan) {
-		return { error: `A plan already exists for the week of ${context.next_week_start_date}.` };
+		if (existingPlan.status === 'generating' || existingPlan.status === 'active') {
+			return { error: `A plan already exists for the week of ${context.next_week_start_date}.` };
+		}
+		// Plan exists but is completed — advance to next week
+		const nextMonday = new Date(context.next_week_start_date);
+		nextMonday.setDate(nextMonday.getDate() + 7);
+		context.next_week_start_date = nextMonday.toISOString().split('T')[0];
+		context.next_week_number += 1;
 	}
 
 	// 3. Build exercise catalog filtered by athlete's equipment + injuries
