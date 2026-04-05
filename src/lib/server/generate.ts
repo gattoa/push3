@@ -395,7 +395,6 @@ export async function generatePlan(
 		const nextMonday = new Date(context.next_week_start_date);
 		nextMonday.setDate(nextMonday.getDate() + 7);
 		context.next_week_start_date = nextMonday.toISOString().split('T')[0];
-		context.next_week_number += 1;
 	}
 
 	// 3. Build exercise catalog filtered by athlete's equipment + injuries
