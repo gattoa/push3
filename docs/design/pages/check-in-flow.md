@@ -29,15 +29,17 @@ The current banner-based check-in prompt has several failure modes:
 Three mutually exclusive states on `/workout`, determined on page load:
 
 #### State 1: Normal Workout Flow
-**When:** Today is a scheduled workout day within the current calendar week, and a workout exists in the plan for today.
+**When:** Today is a scheduled workout day within the current calendar week, a workout exists in the plan for today, AND the workout still has unresolved sets (pending).
 
 **Shows:** Existing workout session UI (unchanged).
 
 #### State 2: End-of-Week Check-In (Same Calendar Week)
 **When:**
 - Today is within the same calendar week as the active plan, AND
-- Today is after `max(user_settings.training_days)` (the last declared training day), AND
-- Today has no scheduled workout (covers both rest days and days swapped into rest via the Plan page's Edit mode).
+- Today is at or after the day following `max(user_settings.training_days)`, AND
+- Today has no actionable workout (either no workout scheduled, or today's workout exists but all sets are resolved — completed or skipped).
+
+**Sunday note:** Sunday is functionally the same as State 2 on any other end-of-week day, but the header copy and supporting text should acknowledge that the calendar is about to roll over (e.g., "Your week ends today" instead of "Your training week"). Same interactions, same CTA, slightly stronger framing to indicate the hard boundary.
 
 **Shows:**
 ```
@@ -121,17 +123,27 @@ onLoadWorkoutPage() {
   // Case A: Plan exists for current week
   if (plan) {
     const todayDay = plan.days.find(d => d.day_index === today)
-    if (todayDay && todayDay.exercises.length > 0) {
-      return State.NORMAL_WORKOUT(todayDay)  // Today has a workout
+    const hasWorkoutToday = todayDay && todayDay.exercises.length > 0
+    const hasActionableWork = hasWorkoutToday && todayDay.exercises.some(
+      ex => ex.sets.some(s => s.log?.status !== 'completed' && s.log?.status !== 'skipped')
+    )
+
+    // If today has a workout with unresolved sets, show normal workout flow
+    if (hasActionableWork) {
+      return State.NORMAL_WORKOUT(todayDay)
     }
 
+    // Otherwise, check if we're at or past the end of the training week
     const lastTrainingDay = max(settings.training_days)
     if (today > lastTrainingDay) {
+      // End of week state — covers both rest days after last training day
+      // AND days where a swapped-in workout just finished
       const incompleteWorkouts = findIncompleteWorkouts(plan)
       return State.END_OF_WEEK(plan, incompleteWorkouts)
     }
 
-    return State.REST_DAY(plan)  // Existing rest day state
+    // Earlier in the week, today has no actionable work — existing rest day state
+    return State.REST_DAY(plan)
   }
 
   // Case B: No plan for current week — calendar rolled over
@@ -176,14 +188,19 @@ This provides a secondary path so `/workout` is not the single point of entry fo
 - After Sunday's workout is resolved, check-in would trigger Monday — but Monday is a new calendar week → State 3 (Monday gate) is the correct state
 - **Note:** This means Sunday trainers have their check-in "catch-up window" on Monday only, not a multi-day window like Mon-Fri trainers. This is consistent with the calendar rules.
 
-### Edge Case 2: Skipped Monday, Swap to Sunday Before Check-In
+### Edge Case 2: Skipped Monday, Swap to Saturday, Then Tuesday to Sunday
 - User has Mon-Fri training days
-- User skipped Monday, did Thu and Fri
+- User skipped Monday and Tuesday, did Thursday and Friday
 - On Saturday, State 2 triggers (today > max training day, today has no workout)
-- Incomplete Monday workout is shown with "Do Today" action
-- User taps "Do Today" → swap happens → today (Saturday) now has the Push workout → State 1 on Saturday
-- After completing Saturday's work, State 2 re-triggers on Sunday (assuming still no other workouts remain)
-- User checks in Sunday → flow complete
+- Incomplete Monday and Tuesday workouts shown with "Do Today" actions
+- User taps "Do Today" on Monday → swap Monday/Saturday → Saturday now has Push → State 1
+- User completes Saturday's Push → all sets resolved → State 2 re-triggers on Saturday (not State 1)
+- Week summary now reflects 3 completed workouts; Tuesday is still incomplete
+- Sunday morning: State 2 still showing (today > max training day, no workout on Sunday)
+- User taps "Do Today" on Tuesday → swap Tuesday/Sunday → Sunday now has the workout → State 1
+- User completes Sunday's workout → State 2 re-triggers on Sunday with all workouts resolved
+- Sunday-specific header copy: "Your week ends today"
+- User taps "Check In" → flow complete
 
 ### Edge Case 3: Check In, Then Try to Swap to Sunday
 - User checks in Saturday, plan marked `completed`
