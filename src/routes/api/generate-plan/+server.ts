@@ -60,6 +60,27 @@ export const POST: RequestHandler = async ({ locals: { safeGetSession, supabase,
 		}
 	}
 
+	// Block generation if there's an active plan from a previous week awaiting check-in.
+	// The user must check in to close the old plan before a new one can be generated.
+	const { getCurrentMonday } = await import('$lib/utils/date');
+	const currentMondayForGuard = getCurrentMonday(timezone);
+
+	const { data: pendingActivePlan } = await supabase
+		.from('weekly_plans')
+		.select('id, week_start_date')
+		.eq('user_id', user.id)
+		.eq('status', 'active')
+		.lt('week_start_date', currentMondayForGuard)
+		.limit(1)
+		.maybeSingle();
+
+	if (pendingActivePlan) {
+		return json(
+			{ error: 'You have a pending check-in for a previous week. Please check in first.' },
+			{ status: 409 }
+		);
+	}
+
 	try {
 		const result = await generatePlan(supabase, user.id, timezone);
 

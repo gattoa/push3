@@ -320,9 +320,12 @@
 	let swappingId = $state<string | null>(null);
 
 	function getAlternatives(exercise: FullPlanExercise): ExerciseAlternative[] | null {
-		if (exercise.alternatives && exercise.alternatives.length > 0) return exercise.alternatives;
-		if (alternativesCache[exercise.id]) return alternativesCache[exercise.id];
-		return null;
+		const raw = exercise.alternatives && exercise.alternatives.length > 0
+			? exercise.alternatives
+			: alternativesCache[exercise.id] ?? null;
+		if (!raw) return null;
+		// Filter out the exercise itself (stored at index 0 for rotation)
+		return raw.filter((a) => a.exercise_id !== exercise.exercise_id);
 	}
 
 	async function fetchFallbackAlternatives(exercise: FullPlanExercise) {
@@ -364,7 +367,7 @@
 			} else {
 				const { error } = await res.json();
 				console.error('[swap] Failed:', error);
-				addToast('Swap failed — try again', 'error');
+				addToast('Swap failed \u2014 try again', 'error');
 			}
 		} finally {
 			swappingId = null;
@@ -1088,12 +1091,6 @@
 		height: 100%;
 		object-fit: cover;
 		display: block;
-		opacity: 0;
-		transition: opacity var(--duration-slow) var(--ease-out);
-	}
-
-	.swap-alt-gif img.loaded {
-		opacity: 1;
 	}
 
 	.swap-alt-info {

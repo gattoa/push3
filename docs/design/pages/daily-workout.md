@@ -86,7 +86,7 @@ When viewing a specific day via the weekly agenda:
 
 ### Banner System
 - A single banner slot sits above the progress bar. At most one banner at a time.
-- **Check-in banner:** Appears when check-in day arrives (Sunday). Lavender theme (`--color-reflect-muted` background). Lucide `ClipboardCheck` icon. Navigates to `/check-in`.
+- **Check-in banner:** Appears when check-in day arrives (auto-computed as the day after the user's last training day). Lavender theme (`--color-reflect-muted` background). Lucide `ClipboardCheck` icon. Navigates to `/check-in`.
 - **Plan review banner:** Appears after new plan generation (< 48hrs old, week > 1). Mint theme (`--color-activity-muted` background). Lucide `Eye` icon. Navigates to `/plan`.
 - **Priority:** Check-in takes precedence over plan review.
 - **Persistence:** Dismiss via × button. Dismissed state stored in localStorage with 48hr expiry.
@@ -249,7 +249,7 @@ Inputs appear as **plain inline text** at rest — no visible borders or backgro
 - `getFullPlan()` RPC → filter to today's `day_index`
 - `user_settings.unit_pref` for display
 - **Exercise history:** For each exercise in today's plan, fetch `last_weight`, `last_reps`, and `best_e1rm` from prior weeks' `set_logs`. Parallelized with settings query via `Promise.all`.
-- **Banner logic:** Check if today is check-in day (Sunday) + no existing check-in for current week. Check if plan was generated < 48hrs ago + week > 1.
+- **Banner logic:** Check if today is check-in day (computed from `training_days` as `(max(training_days) + 1) % 7`) + no existing check-in for current week. Check if plan was generated < 48hrs ago + week > 1.
 
 ### Client State
 - `setStates` — reactive record keyed by `planned_set_id` with `{ weight, reps, status, saving, logId }`

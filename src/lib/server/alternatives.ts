@@ -12,6 +12,7 @@ import { ANTHROPIC_API_KEY } from '$env/static/private';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ExerciseAlternative } from '$lib/types/database';
 import { getExercisesByEquipment } from '$lib/server/exercisedb';
+import { mapEquipmentToDb } from '$lib/server/equipment';
 import type { Exercise } from '$lib/types/exercise';
 
 // ============================================================================
@@ -131,7 +132,7 @@ export async function computeAlternativesForPlan(
 	}
 
 	// 3. Build candidate catalog from user's equipment
-	const equipment = [...new Set([...(settings.equipment ?? []), 'body weight'])];
+	const equipment = mapEquipmentToDb(settings.equipment ?? []);
 	const candidateCatalog = await buildCandidateCatalog(equipment);
 	console.log(`[alternatives] Candidate catalog: ${candidateCatalog.length} exercises`);
 
@@ -165,7 +166,7 @@ export async function computeAlternativesForPlan(
 
 1. Serve the same programming purpose — match the movement pattern (press for press, hinge for hinge, pull for pull), not just the target muscle
 2. Are appropriate for a ${settings.experience_level} athlete with a ${settings.goals} goal
-3. Use varied equipment across the 3 picks where possible (e.g., barbell, dumbbell, cable)
+3. Each of the 3 alternatives MUST use a different equipment type than the prescribed exercise. For example, if the prescribed exercise uses a barbell, do NOT suggest another barbell exercise — pick from dumbbell, cable, machine, etc. Across the 3 picks, use at least 2 different equipment types
 4. Do NOT include any exercise already prescribed on the same training day
 5. Do NOT include the exercise itself as an alternative
 6. Every alternative must come from the candidate catalog below
@@ -200,10 +201,25 @@ Call the set_alternatives tool once with all exercises.`;
 		const result = toolBlock.input as AlternativesResult;
 
 		// 6. Persist to database (enrich with gif URLs from catalog)
+		// Build lookups for enrichment
 		const gifLookup = buildGifLookup(candidateCatalog);
+		const catalogLookup = new Map(candidateCatalog.map((e) => [e.id, e]));
+
 		let successCount = 0;
 		for (const item of result.exercises) {
-			const alternatives: ExerciseAlternative[] = item.alternatives.slice(0, 3).map((a) => ({
+			// Find the planned exercise's own metadata so rotation has it pre-cached
+			const plannedEx = dayGroups.flatMap((d) => d.exercises).find((e) => e.id === item.planned_exercise_id);
+			const selfData = plannedEx ? catalogLookup.get(plannedEx.exercise_id) : null;
+			const selfEntry: ExerciseAlternative | null = selfData ? {
+				exercise_id: selfData.id,
+				exercise_name: selfData.name,
+				body_part: selfData.bodyPart,
+				target: selfData.target,
+				equipment: selfData.equipment,
+				gif_url: selfData.gifUrl
+			} : null;
+
+			const aiAlternatives: ExerciseAlternative[] = item.alternatives.slice(0, 3).map((a) => ({
 				exercise_id: a.exercise_id,
 				exercise_name: a.exercise_name,
 				body_part: a.body_part,
@@ -211,6 +227,10 @@ Call the set_alternatives tool once with all exercises.`;
 				equipment: a.equipment,
 				gif_url: gifLookup.get(a.exercise_id)
 			}));
+
+			// Store as [self, alt1, alt2, alt3] — self entry at index 0
+			// UI shows only items where exercise_id !== current exercise_id
+			const alternatives = selfEntry ? [selfEntry, ...aiAlternatives] : aiAlternatives;
 
 			const { error } = await supabase
 				.from('planned_exercises')

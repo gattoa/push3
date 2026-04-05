@@ -284,7 +284,7 @@ export async function swapExercise(
 	newExerciseName: string,
 	userId: string
 ): Promise<{ success: true } | { success: false; error: string }> {
-	// 1. Read current exercise row to preserve alternatives
+	// 1. Read current exercise to build rotated alternatives
 	const { data: currentExercise, error: exerciseQueryError } = await supabase
 		.from('planned_exercises')
 		.select('exercise_id, exercise_name, alternatives')
@@ -296,18 +296,11 @@ export async function swapExercise(
 		return { success: false, error: exerciseQueryError?.message ?? 'Exercise not found' };
 	}
 
-	// Build rotated alternatives: original exercise replaces the picked one
-	const originalAsAlt: ExerciseAlternative = {
-		exercise_id: currentExercise.exercise_id,
-		exercise_name: currentExercise.exercise_name,
-		body_part: '',
-		target: '',
-		equipment: ''
-	};
-	const remaining = ((currentExercise.alternatives as ExerciseAlternative[] | null) ?? []).filter(
-		(a) => a.exercise_id !== newExerciseId
-	);
-	const rotatedAlternatives = [originalAsAlt, ...remaining];
+	// Alternatives are a fixed group of 4 exercises [A, B, C, D].
+	// The array never changes — the UI filters out whichever is currently active.
+	// Swap A→B: array stays [A, B, C, D], UI shows [A, C, D].
+	// Swap B→C: array stays [A, B, C, D], UI shows [A, B, D].
+	const rotatedAlternatives = (currentExercise.alternatives as ExerciseAlternative[] | null) ?? [];
 
 	// 2. Read existing planned_sets (preserve rep scheme for the new exercise)
 	const { data: sets, error: setsQueryError } = await supabase

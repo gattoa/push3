@@ -88,7 +88,15 @@ The check-in captures how the athlete's week went and what's changed. It feeds t
 ## Entry Point
 
 Users reach the check-in from a single entry point:
-- **Check-in banner** on the Workout tab (`/workout`). Appears when the check-in day arrives (Sunday for POC; configurable post-POC), regardless of whether all training days are complete. Persists 48 hours or until dismissed. See [daily-workout.md](daily-workout.md) Banner System.
+- **Check-in banner** on the Workout tab (`/workout`). Appears when the check-in day arrives (auto-computed as the day after the user's last training day, e.g., Sunday for a Mon–Sat schedule), regardless of whether all training days are complete. Persists 48 hours or until dismissed. See [daily-workout.md](daily-workout.md) Banner System.
+
+### Check-In Day: Auto-Computed, Not Configurable
+
+The check-in day is automatically set to the day after the user's last training day: `(max(training_days) + 1) % 7`. It is **not** user-configurable.
+
+**Rationale (from commit b8c1f60):** The original spec called for a configurable check-in day. During implementation we determined there is only one optimal answer — the day after the last training day. Exposing this as a setting risks users checking in mid-week, which loses performance data and degrades plan quality. Per Tesler's Law, complexity with a correct answer should be handled by the system.
+
+The `user_settings.check_in_day` column stores the computed value and is updated automatically when training days change (in onboarding and settings). The workout page reads `training_days` and recomputes on each load — these two paths should stay in sync.
 
 Previous entry points (agenda header link, workout completion button) have been removed to reduce duplication and consolidate the check-in trigger into the banner system.
 
