@@ -10,7 +10,9 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase,
 	const currentMonday = getCurrentMonday(timezone);
 
 	// Request this week's plan specifically — not "latest"
-	const fullPlan = await getFullPlan(supabase, user.id, { weekStartDate: currentMonday });
+	// A completed plan is historical — treat it as "no plan" so generation triggers.
+	const rawPlan = await getFullPlan(supabase, user.id, { weekStartDate: currentMonday });
+	const fullPlan = rawPlan?.plan?.status === 'completed' ? null : rawPlan;
 
 	// Compute today's day index for highlighting
 	const todayIndex = getTodayIndex(timezone);
