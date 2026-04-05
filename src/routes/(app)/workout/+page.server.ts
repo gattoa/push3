@@ -116,6 +116,21 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase,
 	const showCheckInBanner = isCheckInDay && !existingCheckIn;
 	const showPlanReviewBanner = isNewPlan && fullPlan.plan.week_number > 1;
 
+	// DIAGNOSTIC: remove after banner bug is resolved
+	console.log('[banner-debug]', {
+		dayIndex,
+		trainingDays,
+		lastTrainingDay,
+		checkInDay,
+		isCheckInDay,
+		planWeekNumber: fullPlan.plan.week_number,
+		planStatus: fullPlan.plan.status,
+		existingCheckInId: existingCheckIn?.id ?? null,
+		showCheckInBanner,
+		isNewPlan,
+		showPlanReviewBanner
+	});
+
 	return {
 		plan: fullPlan.plan,
 		day,
