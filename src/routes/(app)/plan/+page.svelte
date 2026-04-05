@@ -23,7 +23,7 @@
 	let genError = $state('');
 	let pollTimer: ReturnType<typeof setInterval> | null = null;
 	let pollCount = $state(0);
-	const MAX_POLLS = 20; // 20 × 3s = 60s timeout
+	const MAX_POLLS = 40; // 40 × 3s = 120s timeout
 
 	const isGenerating = $derived(genState === 'generating');
 
@@ -104,9 +104,10 @@
 		pollCount++;
 
 		if (pollCount > MAX_POLLS) {
+			// Don't show an error — the plan is likely still generating.
+			// Switch to a slower poll interval instead of giving up.
 			stopPolling();
-			genState = 'error';
-			genError = 'Plan generation is taking longer than expected. Please refresh the page.';
+			pollTimer = setInterval(pollForPlan, 10000); // slow poll every 10s
 			return;
 		}
 
@@ -370,10 +371,13 @@
 		<PlanSkeleton {trainingDays} />
 
 	{:else if genState === 'error'}
-		<!-- ═══ Generation error ═══ -->
-		<div class="gen-error">
-			<p class="gen-error-msg">{genError}</p>
-			<button class="gen-retry-btn" onclick={retryGeneration}>Try Again</button>
+		<!-- ═══ Generation taking longer than usual ═══ -->
+		<div class="gen-status">
+			<div class="gen-pulse"></div>
+			<div class="gen-text">
+				<p class="gen-title">Still building your plan...</p>
+				<p class="gen-subtitle">This is taking a bit longer. We'll show it as soon as it's ready.</p>
+			</div>
 		</div>
 		<PlanSkeleton {trainingDays} />
 
