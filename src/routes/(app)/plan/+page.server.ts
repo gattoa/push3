@@ -1,6 +1,6 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { getFullPlan } from '$lib/server/supabase';
+import { getCurrentPlan } from '$lib/server/supabase';
 import { getCurrentMonday, getTodayIndex } from '$lib/utils/date';
 
 export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase, timezone } }) => {
@@ -9,22 +9,7 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase,
 
 	const currentMonday = getCurrentMonday(timezone);
 
-	// Look for an active/generating plan for this week, or failing that, next week.
-	// A completed plan is historical — skip it and look ahead.
-	const rawPlan = await getFullPlan(supabase, user.id, { weekStartDate: currentMonday });
-	let fullPlan = rawPlan?.plan?.status === 'completed' ? null : rawPlan;
-
-	// If no active plan this week, check next week (handles post-check-in on Sunday
-	// where the new plan targets next Monday)
-	if (!fullPlan) {
-		const nextMonday = new Date(currentMonday);
-		nextMonday.setDate(nextMonday.getDate() + 7);
-		const nextMondayStr = nextMonday.toISOString().split('T')[0];
-		const nextWeekPlan = await getFullPlan(supabase, user.id, { weekStartDate: nextMondayStr });
-		if (nextWeekPlan?.plan?.status === 'active' || nextWeekPlan?.plan?.status === 'generating') {
-			fullPlan = nextWeekPlan;
-		}
-	}
+	const fullPlan = await getCurrentPlan(supabase, user.id, currentMonday);
 
 	// Compute today's day index for highlighting
 	const todayIndex = getTodayIndex(timezone);

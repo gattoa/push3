@@ -90,6 +90,31 @@ export async function getFullPlan(
 	return data;
 }
 
+/**
+ * Get the current relevant plan for the user.
+ * Looks for an active/generating plan for this week. If this week's plan
+ * is completed (post-check-in), checks next week — the new plan may have
+ * been generated targeting next Monday.
+ */
+export async function getCurrentPlan(
+	supabase: SupabaseClient,
+	userId: string,
+	currentMonday: string
+): Promise<FullPlan | null> {
+	const rawPlan = await getFullPlan(supabase, userId, { weekStartDate: currentMonday });
+	if (rawPlan?.plan?.status !== 'completed') return rawPlan;
+
+	// This week's plan is completed — check next week
+	const nextMonday = new Date(currentMonday);
+	nextMonday.setDate(nextMonday.getDate() + 7);
+	const nextMondayStr = nextMonday.toISOString().split('T')[0];
+	const nextWeekPlan = await getFullPlan(supabase, userId, { weekStartDate: nextMondayStr });
+	if (nextWeekPlan?.plan?.status === 'active' || nextWeekPlan?.plan?.status === 'generating') {
+		return nextWeekPlan;
+	}
+	return null;
+}
+
 export async function getGenerationContext(
 	supabase: SupabaseClient,
 	userId: string,
