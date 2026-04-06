@@ -1,6 +1,6 @@
 import { redirect, error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { getFullPlan, getExerciseHistory } from '$lib/server/supabase';
+import { getCurrentPlan, getExerciseHistory } from '$lib/server/supabase';
 import { getCurrentMonday } from '$lib/utils/date';
 
 export const load: PageServerLoad = async ({ params, locals: { safeGetSession, supabase, timezone } }) => {
@@ -13,7 +13,7 @@ export const load: PageServerLoad = async ({ params, locals: { safeGetSession, s
 	}
 
 	const currentMonday = getCurrentMonday(timezone);
-	const fullPlan = await getFullPlan(supabase, user.id, { weekStartDate: currentMonday });
+	const fullPlan = await getCurrentPlan(supabase, user.id, currentMonday);
 
 	if (!fullPlan || !fullPlan.plan) {
 		// No plan for this week — send to plan page (shows empty state)
