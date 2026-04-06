@@ -52,28 +52,18 @@
 
 ## What's Next (Not Yet Implemented)
 
-### P4 — Implement State 2 Page State
-Replace the dismissible banner with a page state on `/workout` when check-in is available.
+### P4 — Implement End of Week + Plan Review Page States
+Replace the dismissible check-in banner with page states on `/workout`.
 
-**Design docs:**
-- `docs/design/pages/check-in-flow.md` — full design
-- `docs/design/pages/check-in-flow-wireframes.md` — wireframes
+**Design + wireframes:** Integrated into `docs/design/pages/daily-workout.md` (Layout and States sections).
 
 **Scope:**
-- New trigger logic in `/workout/+page.server.ts`
-- New `WeekEndState.svelte` component
-- `/workout/+page.svelte` selects between workout, week-end state, and rest day
-- Remove check-in banner dismissal/expiry logic (keep plan-review banner)
-
-### P5 — Persistent Check-In Entry on `/plan`
-Always-visible check-in link/button on the plan page. Enabled when actionable, disabled otherwise. Secondary path so the workout page isn't the only way to check in.
-
-### P6 — "Do Today" Swap Action in State 2
-The incomplete-workout recovery flow from the wireframes. Each unfinished workout shows a "Do Today" button that swaps it onto today via existing `/api/swap-days`.
-
-### P7 — Update Remaining Docs
-- `daily-workout.md` — update Banner System section to reflect page-state approach
-- `check-in.md` — update Entry Point section
+- New trigger logic in `/workout/+page.server.ts` (determine which state to render)
+- New component(s) for End of Week state and Plan Review state
+- `/workout/+page.svelte` selects between: workout, end-of-week, plan review, rest day
+- "Do Today" swap action on incomplete workouts (calls existing `/api/swap-days`)
+- Remove check-in banner dismissal/expiry logic (keep plan-review banner for now)
+- Update `check-in.md` Entry Point section to reflect page-state approach
 - Mark `banner.ts` utility as plan-review only
 
 ---
