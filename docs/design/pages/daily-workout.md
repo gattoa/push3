@@ -53,6 +53,101 @@ This is the app's home screen post-onboarding. It shows today's prescribed worko
 └─────────────────────────────────┘
 ```
 
+### End of Week — All Workouts Resolved
+
+```
+┌───────────────────────────────────┐
+│  [   ]    [ Week | Today ]   [AG] │  ← same header
+│          Saturday, Apr 5          │
+├───────────────────────────────────┤
+│                                    │
+│  ┌─ Your Week ────────────────┐   │
+│  │ ██████████████████████████  │   │  ← full bar (mint + gold)
+│  │                             │   │
+│  │ 5 workouts · 🏆 2 PRs       │   │
+│  │ 🔥 12,400 lb volume         │   │
+│  └─────────────────────────────┘   │
+│                                    │
+│  ┌─────────────────────────────┐  │
+│  │       Check In              │  │  ← lavender CTA
+│  └─────────────────────────────┘  │
+│                                    │
+└───────────────────────────────────┘
+```
+
+### End of Week — Incomplete Workouts Present
+
+```
+┌───────────────────────────────────┐
+│  [   ]    [ Week | Today ]   [AG] │
+│          Saturday, Apr 5          │
+├───────────────────────────────────┤
+│                                    │
+│  ┌─ Your Week ────────────────┐   │
+│  │ ████████░░░░░░░░░░░░        │   │  ← partial progress
+│  │                             │   │
+│  │ 2 of 4 workouts · 🏆 1 PR   │   │
+│  │ 🔥 6,200 lb volume          │   │
+│  └─────────────────────────────┘   │
+│                                    │
+│  Still on your plan                │  ← section label
+│                                    │
+│  ┌─────────────────────────────┐  │
+│  │ Monday — Push               │  │
+│  │ 5 exercises · 15 sets       │  │
+│  │                 Do Today →  │  │  ← swap-to-today action
+│  └─────────────────────────────┘  │
+│                                    │
+│  ┌─────────────────────────────┐  │
+│  │ Tuesday — Pull              │  │
+│  │ 4 exercises · 12 sets       │  │
+│  │                 Do Today →  │  │
+│  └─────────────────────────────┘  │
+│                                    │
+│  ┌─────────────────────────────┐  │
+│  │  Skip Remaining & Check In  │  │  ← adaptive CTA
+│  └─────────────────────────────┘  │
+│                                    │
+└───────────────────────────────────┘
+```
+
+### Plan Review — New Plan Generated
+
+```
+┌───────────────────────────────────┐
+│  [   ]    [ Week | Today ]   [AG] │
+│          Sunday, Apr 6            │
+├───────────────────────────────────┤
+│                                    │
+│  ┌─ Last Week ────────────────┐   │
+│  │ ██████████████████████████  │   │  ← celebration
+│  │                             │   │
+│  │ 4 workouts · 🏆 2 PRs       │   │
+│  │ 🔥 10,800 lb volume         │   │
+│  └─────────────────────────────┘   │
+│                                    │
+│  Next week                         │  ← section label
+│                                    │
+│  ┌─────────────────────────────┐  │
+│  │ Monday — Push               │  │  ← preview of new plan
+│  │ 5 exercises · 15 sets       │  │
+│  └─────────────────────────────┘  │
+│  ┌─────────────────────────────┐  │
+│  │ Tuesday — Pull              │  │
+│  │ 4 exercises · 12 sets       │  │
+│  └─────────────────────────────┘  │
+│  ┌─────────────────────────────┐  │
+│  │ Thursday — Upper            │  │
+│  │ 5 exercises · 15 sets       │  │
+│  └─────────────────────────────┘  │
+│  ┌─────────────────────────────┐  │
+│  │ Friday — Lower              │  │
+│  │ 4 exercises · 12 sets       │  │
+│  └─────────────────────────────┘  │
+│                                    │
+└───────────────────────────────────┘
+```
+
 ## Design Decisions
 
 ### Header
@@ -85,12 +180,10 @@ When viewing a specific day via the weekly agenda:
 - Back arrow on `[day]` → `/plan` (return to week overview)
 
 ### Banner System
-- A single banner slot sits above the progress bar. At most one banner at a time.
-- **Check-in banner:** Appears when check-in day arrives (auto-computed as the day after the user's last training day). Lavender theme (`--color-reflect-muted` background). Lucide `ClipboardCheck` icon. Navigates to `/check-in`.
-- **Plan review banner:** Appears after new plan generation (< 48hrs old, week > 1). Mint theme (`--color-activity-muted` background). Lucide `Eye` icon. Navigates to `/plan`.
-- **Priority:** Check-in takes precedence over plan review.
-- **Persistence:** Dismiss via × button. Dismissed state stored in localStorage with 48hr expiry.
-- **Visual:** Distinct from exercise cards — uses `--radius-sm`, subtle glow shadow, no card border weight. Should read as a system notification, not content.
+
+> **Deprecated for check-in.** The check-in banner has been replaced by the **End of Week** page state (see States section). Check-in is core to the product loop and should never be dismissible. The plan-review banner remains as a transient notification.
+
+- **Plan review banner:** Appears after new plan generation (< 48hrs old, week > 1). Mint theme (`--color-activity-muted` background). Lucide `Eye` icon. Navigates to `/plan`. Dismiss via × button. Dismissed state stored in localStorage with 48hr expiry.
 
 ### Segmented Progress Bar
 - One segment per set, ordered by exercise sequence then set number.
@@ -229,7 +322,49 @@ Inputs appear as **plain inline text** at rest — no visible borders or backgro
 
 ### Today Detection
 - Map current day of week (Mon=0 … Sun=6) to the matching `planned_day.day_index`
-- If today is a rest day: show rest day state (see States section)
+- Uses `getCurrentPlan()` helper to resolve the active plan (checks this week first, falls through to next week if this week's plan is completed)
+- State selection logic:
+
+```
+if (today has a workout AND has pending sets) → Normal workout (Fresh/In Progress/Complete)
+else if (new plan exists after check-in) → Plan Review
+else if (today >= max(training_days)) → End of Week
+else → Rest Day
+```
+
+### State Transitions
+
+```
+                  ┌─────────────────┐
+                  │   Normal        │
+                  │   Workout       │
+                  └────────┬────────┘
+                           │
+                  (all sets resolved
+                   AND today >= max(training_days))
+                           │
+                           ▼
+            ┌──────────────────────────┐
+            │       End of Week          │
+            └──────┬────────────┬──────┘
+                   │            │
+            ("Do Today")   ("Check In")
+                   │            │
+                   ▼            ▼
+              Normal       /check-in
+              Workout         │
+                              ▼
+                       [plan generates]
+                              │
+                              ▼
+                        Plan Review
+                              │
+                     (next training day)
+                              │
+                              ▼
+                        Normal Workout
+                         (new week)
+```
 
 ## States
 
@@ -238,10 +373,13 @@ Inputs appear as **plain inline text** at rest — no visible borders or backgro
 | **Fresh** | No sets logged today. Active exercise expanded, all inputs show placeholders. |
 | **In Progress** | Some sets logged. Completed exercises collapse and dim. Active exercise expanded. Segmented progress bar reflects set outcomes. |
 | **Complete** | All sets have status. Summary card visible. Progress bar hidden. All exercise cards collapsed and dimmed. |
-| **Rest Day** | Today has no exercises. Shows: (1) week-so-far summary (days trained, sets completed, completion %), and (2) next training day preview with full exercise list — read-only, muted styling, labeled "Up Next — [Day]." Exercise names link to `/exercise/[id]`. |
+| **Rest Day** | Today has no exercises and it's before the last training day. Shows: (1) week-so-far summary (days trained, sets completed, completion %), and (2) next training day preview with full exercise list — read-only, muted styling, labeled "Up Next — [Day]." Exercise names link to `/exercise/[id]`. |
 | **Rest Day (Week 1 Cold Start)** | No workouts logged yet. Motivational welcome message. |
 | **Cold Start (Week 1)** | No "Last" reference line — shows "First time" with Dumbbell icon. No target weights (by design — no baseline exists). No PR detection. |
-| **No Plan** | User has no active plan. Redirect to `/plan/generate`. |
+| **End of Week** | Today is at or past the last training day (`>= max(training_days)`) and today has no actionable workout (either no workout scheduled, or today's workout is fully resolved). Shows week summary card (workouts completed, PRs, volume). If incomplete workouts remain, each is shown with a "Do Today" action that swaps it onto today via `/api/swap-days`. Adaptive CTA: "Check In" if all work is resolved, "Skip Remaining & Check In" if incomplete workouts exist. Not dismissible — persists until check-in is submitted. Replaces the deprecated check-in banner. |
+| **End of Week (Monday Gate)** | Calendar has rolled to a new week without check-in. Same UI as End of Week but shows last week's summary as read-only. No "Do Today" actions — last week is closed (weeks cannot leech into each other per calendar-anchored plan rules). Only CTA: "Check In." |
+| **Plan Review** | New plan has been generated after check-in. Shows last week's summary (celebration) and preview of next week's plan. Automatically replaced by the normal workout state when the next training day arrives. Per product brief: "Persists until the user engages with it, even if they don't open the app until Monday." |
+| **No Plan** | User has no active plan. Redirect to `/plan`. |
 
 ## Data Requirements
 
@@ -249,12 +387,12 @@ Inputs appear as **plain inline text** at rest — no visible borders or backgro
 - `getFullPlan()` RPC → filter to today's `day_index`
 - `user_settings.unit_pref` for display
 - **Exercise history:** For each exercise in today's plan, fetch `last_weight`, `last_reps`, and `best_e1rm` from prior weeks' `set_logs`. Parallelized with settings query via `Promise.all`.
-- **Banner logic:** Check if today is check-in day (computed from `training_days` as `(max(training_days) + 1) % 7`) + no existing check-in for current week. Check if plan was generated < 48hrs ago + week > 1.
+- **State logic:** Determine which page state to render based on: (1) does today have an actionable workout, (2) is today at or past the last training day, (3) has the calendar rolled over without check-in, (4) has a new plan been generated. Uses `getCurrentPlan()` helper which checks this week and falls through to next week if this week's plan is completed.
 
 ### Client State
 - `setStates` — reactive record keyed by `planned_set_id` with `{ weight, reps, status, saving, logId }`
 - `expandedExercise` — which exercise card is expanded (auto-set to first exercise with pending sets)
-- `bannerDismissed` — dismiss state (backed by localStorage)
+- `bannerDismissed` — dismiss state for plan-review banner (backed by localStorage)
 - Derived: `totalSets`, `completedSets`, `skippedSets`, `totalVolume`, `allDone`, `prCount`, `segments`
 
 ## Open Questions (Deferred)
